@@ -81,10 +81,10 @@ Timeline
 Note: CLI binary for Linux, macOS, and Windows will be published on GitHub Releases.
 
 # via Homebrew (soon)
-brew install your-org/dai
+brew install HibiZA/dai
 
 # or download latest release:
-curl -L https://github.com/your-org/dai/releases/latest/download/dai_$(uname -s)_$(uname -m).tar.gz | tar xz && mv dai /usr/local/bin/
+curl -L https://github.com/HibiZA/dai/releases/latest/download/dai_$(uname -s)_$(uname -m).tar.gz | tar xz && mv dai /usr/local/bin/
 
 🎯 Usage
 
@@ -111,7 +111,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: Run Dai Upgrade
         run: |
-          curl -sSL https://install.your-org.io/dai.sh | bash
+          curl -sSL https://install.HibiZA.io/dai.sh | bash
           dai upgrade --all
 
 🤝 Contributing

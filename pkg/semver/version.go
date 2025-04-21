@@ -140,7 +140,52 @@ func (v *Version) String() string {
 
 // IsCompatible checks if the version is compatible with the constraint
 func IsCompatible(version, constraint string) (bool, error) {
-	// TODO: Implement proper semver constraint checking
-	// For now, just check if the versions match
-	return version == constraint, nil
+	v, err := Parse(version)
+	if err != nil {
+		return false, fmt.Errorf("invalid version: %w", err)
+	}
+
+	constraintType, constraintVersion, err := ParseConstraint(constraint)
+	if err != nil {
+		return false, fmt.Errorf("invalid constraint: %w", err)
+	}
+
+	switch constraintType {
+	case "^":
+		// Compatible with changes that do not modify the left-most non-zero digit
+		// ^1.2.3 => >=1.2.3 <2.0.0
+		// ^0.2.3 => >=0.2.3 <0.3.0
+		// ^0.0.3 => >=0.0.3 <0.0.4
+		if constraintVersion.Major > 0 {
+			return v.Major == constraintVersion.Major &&
+				Compare(v, constraintVersion) >= 0, nil
+		} else if constraintVersion.Minor > 0 {
+			return v.Major == 0 &&
+				v.Minor == constraintVersion.Minor &&
+				Compare(v, constraintVersion) >= 0, nil
+		} else {
+			return v.Major == 0 &&
+				v.Minor == 0 &&
+				v.Patch == constraintVersion.Patch, nil
+		}
+	case "~":
+		// Compatible with patch-level changes
+		// ~1.2.3 => >=1.2.3 <1.3.0
+		return v.Major == constraintVersion.Major &&
+			v.Minor == constraintVersion.Minor &&
+			v.Patch >= constraintVersion.Patch, nil
+	case ">":
+		return Compare(v, constraintVersion) > 0, nil
+	case ">=":
+		return Compare(v, constraintVersion) >= 0, nil
+	case "<":
+		return Compare(v, constraintVersion) < 0, nil
+	case "<=":
+		return Compare(v, constraintVersion) <= 0, nil
+	case "=", "":
+		// Exact match
+		return Compare(v, constraintVersion) == 0, nil
+	default:
+		return false, fmt.Errorf("unsupported constraint type: %s", constraintType)
+	}
 }

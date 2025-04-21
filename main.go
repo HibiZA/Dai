@@ -1,6 +1,6 @@
 package main
 
-import "github.com/your-org/dai/cmd"
+import "github.com/HibiZA/dai/cmd"
 
 func main() {
 	cmd.Execute()

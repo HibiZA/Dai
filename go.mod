@@ -1,4 +1,4 @@
-module github.com/your-org/dai
+module github.com/HibiZA/dai
 
 go 1.21
 
@@ -6,5 +6,6 @@ require github.com/spf13/cobra v1.8.0
 
 require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/sashabaranov/go-openai v1.38.2 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 )

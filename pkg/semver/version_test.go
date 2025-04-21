@@ -108,3 +108,53 @@ func TestCompare(t *testing.T) {
 		}
 	}
 }
+
+func TestIsCompatible(t *testing.T) {
+	tests := []struct {
+		version    string
+		constraint string
+		expected   bool
+		wantErr    bool
+	}{
+		// Exact match
+		{"1.2.3", "1.2.3", true, false},
+		{"1.2.3", "1.2.4", false, false},
+
+		// Caret range
+		{"1.2.3", "^1.2.0", true, false},
+		{"1.3.0", "^1.2.3", true, false},
+		{"2.0.0", "^1.2.3", false, false},
+		{"0.2.5", "^0.2.3", true, false},
+		{"0.3.0", "^0.2.3", false, false},
+		{"0.0.4", "^0.0.3", false, false},
+
+		// Tilde range
+		{"1.2.3", "~1.2.3", true, false},
+		{"1.2.4", "~1.2.3", true, false},
+		{"1.3.0", "~1.2.3", false, false},
+
+		// Comparison operators
+		{"1.2.3", ">1.2.2", true, false},
+		{"1.2.3", ">1.2.3", false, false},
+		{"1.2.3", ">=1.2.3", true, false},
+		{"1.2.3", "<1.2.4", true, false},
+		{"1.2.3", "<1.2.3", false, false},
+		{"1.2.3", "<=1.2.3", true, false},
+
+		// Error cases
+		{"invalid", "1.2.3", false, true},
+		{"1.2.3", "invalid", false, true},
+	}
+
+	for _, test := range tests {
+		compatible, err := IsCompatible(test.version, test.constraint)
+		if (err != nil) != test.wantErr {
+			t.Errorf("IsCompatible(%q, %q) error = %v, wantErr %v", test.version, test.constraint, err, test.wantErr)
+			continue
+		}
+
+		if !test.wantErr && compatible != test.expected {
+			t.Errorf("IsCompatible(%q, %q) = %v, want %v", test.version, test.constraint, compatible, test.expected)
+		}
+	}
+}

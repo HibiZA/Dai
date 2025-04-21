@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/your-org/dai/pkg/semver"
+	"github.com/HibiZA/dai/pkg/semver"
 )
 
 const (

@@ -8,11 +8,11 @@
 - [x] Set up basic testing framework
 
 ## Phase β (1-2 weeks)
-- [ ] Implement GitHub Advisory Database integration
-- [ ] Add NVD data fetching
-- [ ] Create vulnerability reporting module
-- [ ] Display formatted vulnerability report in console
-- [ ] Add tests for security data integration
+- [x] Implement GitHub Advisory Database integration
+- [x] Add NVD data fetching
+- [x] Create vulnerability reporting module
+- [x] Display formatted vulnerability report in console
+- [x] Add tests for security data integration
 
 ## Phase γ (2 weeks)
 - [x] Set up OpenAI API integration (stub)
@@ -41,3 +41,4 @@
 - [x] Set up CI/CD pipeline
 - [ ] Prepare Homebrew formula
 - [ ] Create release automation for binaries (Linux, macOS, Windows) 
+- [x] Implement semver compatibility checking 

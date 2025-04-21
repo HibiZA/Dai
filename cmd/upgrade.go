@@ -5,11 +5,12 @@ import (
 	"os"
 	"strings"
 
+	"github.com/HibiZA/dai/pkg/ai"
+	"github.com/HibiZA/dai/pkg/config"
+	"github.com/HibiZA/dai/pkg/npm"
+	"github.com/HibiZA/dai/pkg/parser"
+	"github.com/HibiZA/dai/pkg/semver"
 	"github.com/spf13/cobra"
-	"github.com/your-org/dai/pkg/ai"
-	"github.com/your-org/dai/pkg/npm"
-	"github.com/your-org/dai/pkg/parser"
-	"github.com/your-org/dai/pkg/semver"
 )
 
 var (
@@ -198,8 +199,13 @@ func upgradePackages(packages []string) {
 		_, newVersion, _ := semver.ParseConstraint(newVersionStr)
 
 		// Get AI-generated rationale
-		aiClient := ai.NewOpenAiClient(openaiAPIKey)
-		rationale, err := aiClient.GenerateUpgradeRationale(name, currentVersion.String(), newVersion.String(), []string{})
+		cfg := &config.Config{OpenAIApiKey: openaiAPIKey}
+		aiClient, err := ai.NewOpenAiClient(cfg)
+		if err != nil {
+			fmt.Printf("Warning: Failed to create OpenAI client: %v\n", err)
+			continue
+		}
+		rationale, err := aiClient.GenerateUpgradeRationale(name, currentVersion.String(), newVersion.String())
 		if err != nil {
 			fmt.Printf("Warning: Failed to generate rationale: %v\n", err)
 		}
@@ -245,8 +251,25 @@ func upgradePackages(packages []string) {
 
 	// Generate PR description
 	if createPRFlag && len(upgrades) > 0 {
-		aiClient := ai.NewOpenAiClient(openaiAPIKey)
-		description, err := aiClient.GeneratePRDescription(upgrades)
+		cfg := &config.Config{OpenAIApiKey: openaiAPIKey}
+		aiClient, err := ai.NewOpenAiClient(cfg)
+		if err != nil {
+			fmt.Printf("Warning: Failed to create OpenAI client: %v\n", err)
+			return
+		}
+
+		// Convert map[string]VersionUpgrade to []Upgrade
+		upgradesList := make([]ai.Upgrade, 0, len(upgrades))
+		for _, u := range upgrades {
+			upgradesList = append(upgradesList, ai.Upgrade{
+				Package:     u.PackageName,
+				FromVersion: u.OldVersion,
+				ToVersion:   u.NewVersion,
+				Rationale:   u.Rationale,
+			})
+		}
+
+		description, err := aiClient.GeneratePRDescription(upgradesList)
 		if err != nil {
 			fmt.Printf("Warning: Failed to generate PR description: %v\n", err)
 		} else {

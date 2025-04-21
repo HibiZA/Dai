@@ -4,26 +4,33 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/HibiZA/dai/pkg/parser"
+	"github.com/HibiZA/dai/pkg/security"
 	"github.com/spf13/cobra"
-	"github.com/your-org/dai/pkg/parser"
-	"github.com/your-org/dai/pkg/security"
+)
+
+var (
+	outputFormat string
+	scanDev      bool
 )
 
 func init() {
+	scanCmd.Flags().StringVarP(&outputFormat, "format", "f", "text", "Output format: text or table")
+	scanCmd.Flags().BoolVarP(&scanDev, "dev", "d", true, "Scan dev dependencies")
 	rootCmd.AddCommand(scanCmd)
 }
 
 var scanCmd = &cobra.Command{
 	Use:   "scan",
-	Short: "Scan the current project for outdated dependencies",
-	Long:  `Scan command parses your package.json (and lockfile) to list direct and transitive dependencies with current versions.`,
+	Short: "Scan the current project for outdated dependencies and security vulnerabilities",
+	Long:  `Scan command parses your package.json (and lockfile) to check dependencies for security vulnerabilities using multiple data sources.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		scanProject()
 	},
 }
 
 func scanProject() {
-	fmt.Println("Scanning project dependencies...")
+	fmt.Println("Scanning project dependencies for vulnerabilities...")
 
 	// Find package.json
 	dir, err := parser.FindPackageJSON()
@@ -41,25 +48,39 @@ func scanProject() {
 
 	fmt.Printf("Project: %s@%s\n\n", pkg.Name, pkg.Version)
 
-	// Print dependencies
-	if len(pkg.Dependencies) > 0 {
-		fmt.Println("Dependencies:")
-		for name, version := range pkg.Dependencies {
-			fmt.Printf("  - %s: %s\n", name, version)
-			checkVulnerabilities(name, version)
-		}
-		fmt.Println()
+	// Collect all dependencies to scan
+	packagesToScan := make(map[string]string)
+
+	// Add production dependencies
+	for name, version := range pkg.Dependencies {
+		packagesToScan[name] = version
 	}
 
-	// Print dev dependencies
-	if len(pkg.DevDependencies) > 0 {
-		fmt.Println("Dev Dependencies:")
+	// Add dev dependencies if requested
+	if scanDev {
 		for name, version := range pkg.DevDependencies {
-			fmt.Printf("  - %s: %s\n", name, version)
-			checkVulnerabilities(name, version)
+			packagesToScan[name] = version
 		}
-		fmt.Println()
 	}
+
+	// Skip if no dependencies found
+	if len(packagesToScan) == 0 {
+		fmt.Println("No dependencies found to scan.")
+		return
+	}
+
+	// Create a vulnerability reporter and scan all packages
+	scanner := security.NewVulnerabilityScanner()
+	reporter := security.NewVulnerabilityReporter(scanner)
+
+	// Generate reports for all packages
+	reports, err := reporter.ReportMultiple(packagesToScan)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: some packages couldn't be scanned: %v\n\n", err)
+	}
+
+	// Write the console report
+	security.WriteConsoleReport(os.Stdout, reports)
 }
 
 func checkVulnerabilities(name, version string) {
@@ -70,5 +91,17 @@ func checkVulnerabilities(name, version string) {
 	}
 
 	fmt.Printf("    ⚠️  %d vulnerabilities found!\n", len(vulns))
-	// TODO: Display vulnerability details
+
+	// Generate a report for this package
+	reporter := security.NewVulnerabilityReporter(scanner)
+	report, err := reporter.GenerateReport(name, version)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error generating report: %v\n", err)
+		return
+	}
+
+	// Print vulnerability details
+	for i, vuln := range report.Vulnerabilities {
+		fmt.Printf("      [%d] %s - %s (%s)\n", i+1, vuln.ID, vuln.Description, vuln.Severity)
+	}
 }
