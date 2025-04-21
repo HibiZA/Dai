@@ -30,14 +30,16 @@ jobs:
         id: get_version
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-            echo "tag_version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            VERSION="${{ github.event.inputs.version }}"
+            echo "version=${VERSION}" >> $GITHUB_OUTPUT
+            echo "tag_version=${VERSION}" >> $GITHUB_OUTPUT
+            echo "version_number=${VERSION#v}" >> $GITHUB_OUTPUT
           else
             TAG=${GITHUB_REF#refs/tags/}
             echo "version=${TAG}" >> $GITHUB_OUTPUT
             echo "tag_version=${TAG}" >> $GITHUB_OUTPUT
+            echo "version_number=${TAG#v}" >> $GITHUB_OUTPUT
           fi
-          echo "version_number=${TAG#v}" >> $GITHUB_OUTPUT
 
       - name: Create version.go file
         run: |
@@ -107,6 +109,7 @@ jobs:
           tag_name: ${{ steps.get_version.outputs.tag_version }}
           draft: false
           prerelease: false
+          allowUpdates: true
           files: |
             dist/*.tar.gz
             dist/*.zip
@@ -198,6 +201,15 @@ jobs:
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
 
+      - name: Get tag version
+        id: get_tag
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Clone Homebrew tap repository
         run: |
           git clone https://${{ secrets.HOMEBREW_TAP_TOKEN }}@github.com/HibiZA/homebrew-dai.git
@@ -205,5 +217,5 @@ jobs:
           cp dai.rb homebrew-dai/Formula/
           cd homebrew-dai
           git add Formula/dai.rb
-          git commit -m "Update dai to ${{ steps.get_version.outputs.version }}"
+          git commit -m "Update dai to ${{ steps.get_tag.outputs.version }}"
           git push 
