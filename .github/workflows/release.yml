@@ -99,8 +99,8 @@ jobs:
           mv dai_windows_amd64.exe dai.exe
           zip windows_amd64.zip dai.exe
           
-          # Generate checksums
-          sha256sum *.tar.gz *.zip > checksums.txt
+          # Generate checksums only for the final tarballs/zips
+          sha256sum darwin_*.tar.gz linux_*.tar.gz windows_*.zip > checksums.txt
           
           cd ..
 
@@ -125,10 +125,10 @@ jobs:
       - name: Update Homebrew formula
         run: |
           # Get the SHA256 checksums
-          DARWIN_AMD64_SHA=$(grep darwin_amd64.tar.gz dist/checksums.txt | awk '{print $1}')
-          DARWIN_ARM64_SHA=$(grep darwin_arm64.tar.gz dist/checksums.txt | awk '{print $1}')
-          LINUX_AMD64_SHA=$(grep linux_amd64.tar.gz dist/checksums.txt | awk '{print $1}')
-          LINUX_ARM64_SHA=$(grep linux_arm64.tar.gz dist/checksums.txt | awk '{print $1}')
+          DARWIN_AMD64_SHA=$(grep " darwin_amd64.tar.gz$" dist/checksums.txt | awk '{print $1}')
+          DARWIN_ARM64_SHA=$(grep " darwin_arm64.tar.gz$" dist/checksums.txt | awk '{print $1}')
+          LINUX_AMD64_SHA=$(grep " linux_amd64.tar.gz$" dist/checksums.txt | awk '{print $1}')
+          LINUX_ARM64_SHA=$(grep " linux_arm64.tar.gz$" dist/checksums.txt | awk '{print $1}')
           
           VERSION="${{ steps.get_version.outputs.version_number }}"
           VERSION="${VERSION#v}"  # Remove 'v' prefix if present
