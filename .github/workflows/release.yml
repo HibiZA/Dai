@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Install GoReleaser
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          install-only: true
+
+      - name: Extract tag version
+        id: tag
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Run release script
+        run: |
+          ./scripts/release.sh ${{ steps.tag.outputs.version }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Homebrew formula
+        uses: actions/upload-artifact@v4
+        with:
+          name: homebrew-formula
+          path: scripts/homebrew/dai.rb
+
+  homebrew:
+    needs: release
+    runs-on: ubuntu-latest
+    if: github.repository == 'HibiZA/dai'  # Only run on the main repo
+    steps:
+      - name: Download Homebrew formula
+        uses: actions/download-artifact@v4
+        with:
+          name: homebrew-formula
+          path: ./
+
+      - name: Set up Git
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+
+      - name: Clone Homebrew tap repository
+        run: |
+          git clone https://${{ secrets.HOMEBREW_TAP_TOKEN }}@github.com/HibiZA/homebrew-dai.git
+          cp dai.rb homebrew-dai/Formula/
+          cd homebrew-dai
+          git add Formula/dai.rb
+          git commit -m "Update dai to ${{ github.ref_name }}"
+          git push 

@@ -78,13 +78,45 @@ Timeline
 
 📦 Installation
 
-Note: CLI binary for Linux, macOS, and Windows will be published on GitHub Releases.
+### Quick Install (Linux/macOS)
 
-# via Homebrew (soon)
-brew install HibiZA/dai
+```bash
+# Install using the quick installer script
+curl -fsSL https://raw.githubusercontent.com/HibiZA/dai/main/scripts/quickinstall.sh | bash
+```
 
-# or download latest release:
-curl -L https://github.com/HibiZA/dai/releases/latest/download/dai_$(uname -s)_$(uname -m).tar.gz | tar xz && mv dai /usr/local/bin/
+### Manual Installation
+
+You can download the latest binary for your platform from the [GitHub Releases](https://github.com/HibiZA/dai/releases) page.
+
+### Using Homebrew (macOS)
+
+```bash
+# Install from Homebrew
+brew tap HibiZA/dai
+brew install dai
+```
+
+### Using PowerShell (Windows)
+
+```powershell
+# Run in PowerShell
+iwr -useb https://raw.githubusercontent.com/HibiZA/dai/main/scripts/install.ps1 | iex
+```
+
+### Building from Source
+
+```bash
+# Clone the repository
+git clone https://github.com/HibiZA/dai.git
+cd dai
+
+# Build the binary
+go build -o dai
+
+# Optionally, move to your PATH
+sudo mv dai /usr/local/bin/
+```
 
 🎯 Usage
 
@@ -121,3 +153,31 @@ We welcome issues, PRs, and feedback! Please read CONTRIBUTING.md for guidelines
 📄 License
 
 MIT © Your Organization
+
+## GitHub Integration
+
+Dai includes full GitHub integration for automated dependency management:
+
+### Pull Request Automation
+
+- Create PRs with dependency updates using the `--pr` flag
+- AI-generated PR descriptions with detailed upgrade rationales
+- Automatic patch/diff generation to show what changed
+- Draft PRs for review before merging
+
+### GitHub Actions
+
+Dai comes with a pre-configured GitHub Action for automated dependency checking:
+
+- Scheduled dependency vulnerability scans
+- Automated PR creation for updates
+- Report generation for security vulnerabilities
+- Easy configuration through GitHub Secrets
+
+To use the GitHub Action:
+
+1. Copy the `.github/workflows/dependency-check.yml` file to your repository
+2. Add your OpenAI API key as a GitHub Secret named `OPENAI_API_KEY`
+3. The action will run automatically every Monday or can be triggered manually
+
+See the [GitHub Actions documentation](.github/workflows/README.md) for more details.

@@ -3,10 +3,13 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/HibiZA/dai/pkg/ai"
 	"github.com/HibiZA/dai/pkg/config"
+	"github.com/HibiZA/dai/pkg/github"
 	"github.com/HibiZA/dai/pkg/npm"
 	"github.com/HibiZA/dai/pkg/parser"
 	"github.com/HibiZA/dai/pkg/semver"
@@ -23,6 +26,7 @@ var (
 	dryRunFlag      bool
 	registryURLFlag string
 	simulateFlag    bool
+	testAIFlag      bool
 )
 
 func init() {
@@ -35,6 +39,7 @@ func init() {
 	upgradeCmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Show what would be upgraded without making changes")
 	upgradeCmd.Flags().StringVar(&registryURLFlag, "registry", "", "NPM registry URL (defaults to https://registry.npmjs.org)")
 	upgradeCmd.Flags().BoolVar(&simulateFlag, "simulate", false, "Simulate upgrades (don't actually check npm registry)")
+	upgradeCmd.Flags().BoolVar(&testAIFlag, "test-ai", false, "Test AI-generated content quality for specific packages")
 
 	rootCmd.AddCommand(upgradeCmd)
 }
@@ -52,6 +57,12 @@ var upgradeCmd = &cobra.Command{
 
 		if githubToken == "" {
 			githubToken = os.Getenv("DAI_GITHUB_TOKEN")
+		}
+
+		// If test-ai flag is set, run AI testing instead of normal upgrade
+		if testAIFlag {
+			testAIContentQuality(args)
+			return
 		}
 
 		var packages []string
@@ -228,6 +239,13 @@ func upgradePackages(packages []string) {
 	if applyFlag && !dryRunFlag && len(upgrades) > 0 {
 		fmt.Println("\nApplying upgrades to package.json...")
 
+		// Create backup of package.json first
+		backupPath, err := parser.CreateBackup(dir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: Failed to create backup of package.json: %v\n", err)
+			os.Exit(1)
+		}
+
 		// Apply each upgrade
 		for name, upgrade := range upgrades {
 			updated := pkg.UpdateDependency(name, upgrade.NewVersion)
@@ -240,6 +258,17 @@ func upgradePackages(packages []string) {
 		if err := pkg.WriteToFile(dir); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: Failed to write package.json: %v\n", err)
 			os.Exit(1)
+		}
+
+		// Generate diff between the original and modified file
+		diff, err := parser.GenerateDiff(dir, backupPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Failed to generate diff: %v\n", err)
+		} else {
+			fmt.Println("\nChanges to package.json:")
+			fmt.Println("------------------------")
+			fmt.Println(diff)
+			fmt.Println("------------------------")
 		}
 
 		fmt.Println("Upgrades applied successfully!")
@@ -273,20 +302,202 @@ func upgradePackages(packages []string) {
 		if err != nil {
 			fmt.Printf("Warning: Failed to generate PR description: %v\n", err)
 		} else {
+			// Capture diff for PR description
+			var patchInfo string
+			if applyFlag && !dryRunFlag {
+				// Get the diff from the backup
+				diff, err := parser.GenerateDiff(dir, filepath.Join(dir, "package.json.bak"))
+				if err == nil {
+					patchInfo = "\n\n## Changes\n\n```diff\n" + diff + "\n```"
+				}
+			}
+
+			// Append diff to description if available
+			if patchInfo != "" {
+				description += patchInfo
+			}
+
 			fmt.Println("\nPR Description Preview:")
 			fmt.Println("------------------------")
 			fmt.Println(description)
 			fmt.Println("------------------------")
 
 			// Create PR if GitHub token is provided
-			if githubToken != "" {
-				// TODO: Implement GitHub PR creation
+			if githubToken != "" && applyFlag && !dryRunFlag {
 				fmt.Println("\nCreating pull request...")
-				// For now, just print a message
-				fmt.Println("PR creation not implemented yet")
-			} else {
+
+				// Try to determine repository owner and name
+				owner, repo, err := github.GetRepoDetails()
+				if err != nil {
+					fmt.Printf("Warning: Could not determine repository details: %v\n", err)
+					fmt.Println("Please provide repository details manually")
+					fmt.Print("Owner: ")
+					fmt.Scanln(&owner)
+					fmt.Print("Repository: ")
+					fmt.Scanln(&repo)
+				}
+
+				if owner == "" || repo == "" {
+					fmt.Println("Error: Repository details required for PR creation")
+					return
+				}
+
+				// Initialize GitHub client
+				githubClient, err := github.NewGitHubClient(githubToken, owner, repo)
+				if err != nil {
+					fmt.Printf("Error: Failed to create GitHub client: %v\n", err)
+					return
+				}
+
+				// Create a unique branch name based on timestamp
+				branchName := fmt.Sprintf("dai-dependency-update-%d", time.Now().Unix())
+
+				// Get the default branch to use as base
+				baseBranch, err := githubClient.GetDefaultBranch()
+				if err != nil {
+					fmt.Printf("Warning: Could not determine default branch: %v\n", err)
+					baseBranch = "main" // Fallback to main
+				}
+
+				// Read the content of the modified package.json
+				packageJSONPath := filepath.Join(dir, "package.json")
+				packageJSONContent, err := os.ReadFile(packageJSONPath)
+				if err != nil {
+					fmt.Printf("Error: Failed to read package.json: %v\n", err)
+					return
+				}
+
+				// Files to modify in the PR
+				files := map[string]string{
+					"package.json": string(packageJSONContent),
+				}
+
+				// Prepare the PR details
+				prTitle := "chore(deps): update dependencies"
+				if len(upgrades) == 1 {
+					// If only one package was upgraded, make the title more specific
+					for name, upgrade := range upgrades {
+						prTitle = fmt.Sprintf("chore(deps): update %s from %s to %s",
+							name, upgrade.OldVersion, upgrade.NewVersion)
+						break
+					}
+				} else {
+					// Multiple packages upgraded
+					prTitle = fmt.Sprintf("chore(deps): update %d dependencies", len(upgrades))
+				}
+
+				pr := &github.PullRequest{
+					Title:       prTitle,
+					Description: description,
+					Branch:      branchName,
+					BaseBranch:  baseBranch,
+					Files:       files,
+				}
+
+				// Create the pull request
+				prURL, err := githubClient.CreatePullRequest(pr)
+				if err != nil {
+					fmt.Printf("Error: Failed to create pull request: %v\n", err)
+					return
+				}
+
+				fmt.Printf("Pull request created successfully: %s\n", prURL)
+			} else if githubToken == "" {
 				fmt.Println("\nSkipping PR creation (no GitHub token provided)")
+			} else if !applyFlag || dryRunFlag {
+				fmt.Println("\nSkipping PR creation (changes not applied to package.json)")
 			}
 		}
 	}
+}
+
+// testAIContentQuality tests the quality of AI-generated content for packages
+func testAIContentQuality(args []string) {
+	if openaiAPIKey == "" {
+		fmt.Println("Error: OpenAI API key is required for AI testing. Set it with --openai-key flag or DAI_OPENAI_API_KEY env var.")
+		return
+	}
+
+	// Test packages - use defaults if none specified
+	testPackages := []struct {
+		name       string
+		oldVersion string
+		newVersion string
+	}{
+		{"react", "16.14.0", "18.2.0"},
+		{"express", "4.17.1", "4.18.2"},
+		{"lodash", "4.17.20", "4.17.21"},
+	}
+
+	// Allow custom packages to be specified
+	if len(args) > 0 && args[0] != "--all" {
+		customPackages := strings.Split(args[0], ",")
+		if len(customPackages) > 0 {
+			// If user provides custom packages, use those instead
+			testPackages = nil
+			for _, pkg := range customPackages {
+				// Use placeholder versions for custom packages
+				testPackages = append(testPackages, struct {
+					name       string
+					oldVersion string
+					newVersion string
+				}{
+					name:       pkg,
+					oldVersion: "1.0.0",
+					newVersion: "2.0.0",
+				})
+			}
+		}
+	}
+
+	// Create OpenAI client
+	cfg := &config.Config{OpenAIApiKey: openaiAPIKey}
+	aiClient, err := ai.NewOpenAiClient(cfg)
+	if err != nil {
+		fmt.Printf("Error: Failed to create OpenAI client: %v\n", err)
+		return
+	}
+
+	fmt.Println("Testing AI-generated content quality...")
+	fmt.Println("======================================")
+
+	// Test rationale generation
+	fmt.Println("\n1. Testing Upgrade Rationale Generation:")
+	fmt.Println("----------------------------------------")
+	for _, pkg := range testPackages {
+		fmt.Printf("\nPackage: %s (v%s → v%s)\n", pkg.name, pkg.oldVersion, pkg.newVersion)
+
+		rationale, err := aiClient.GenerateUpgradeRationale(pkg.name, pkg.oldVersion, pkg.newVersion)
+		if err != nil {
+			fmt.Printf("  Error: %v\n", err)
+			continue
+		}
+
+		fmt.Printf("  Rationale: %s\n", rationale)
+	}
+
+	// Test PR description generation
+	fmt.Println("\n2. Testing PR Description Generation:")
+	fmt.Println("-----------------------------------")
+	var upgrades []ai.Upgrade
+	for _, pkg := range testPackages {
+		// Generate rationale for each package
+		rationale, _ := aiClient.GenerateUpgradeRationale(pkg.name, pkg.oldVersion, pkg.newVersion)
+
+		upgrades = append(upgrades, ai.Upgrade{
+			Package:     pkg.name,
+			FromVersion: pkg.oldVersion,
+			ToVersion:   pkg.newVersion,
+			Rationale:   rationale,
+		})
+	}
+
+	description, err := aiClient.GeneratePRDescription(upgrades)
+	if err != nil {
+		fmt.Printf("Error generating PR description: %v\n", err)
+	} else {
+		fmt.Println(description)
+	}
+
+	fmt.Println("\nAI content quality testing complete!")
 }

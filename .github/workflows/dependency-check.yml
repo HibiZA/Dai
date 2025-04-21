@@ -1,0 +1,50 @@
+name: Dependency Check
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'  # Run every Monday at midnight
+  workflow_dispatch:     # Allow manual triggering
+
+jobs:
+  check-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Install Dai CLI
+        run: |
+          go build -o dai
+          chmod +x dai
+          sudo mv dai /usr/local/bin/
+
+      - name: Scan for vulnerabilities
+        run: |
+          dai scan --json > vulnerability-report.json
+        continue-on-error: true
+
+      - name: Check for dependency updates
+        run: |
+          dai upgrade --all --simulate > upgrade-report.txt
+        continue-on-error: true
+
+      - name: Create PR for dependency updates
+        if: github.event_name == 'workflow_dispatch'  # Only create PR on manual trigger
+        run: |
+          dai upgrade --all --apply --pr --github-token ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DAI_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Upload reports as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-reports
+          path: |
+            vulnerability-report.json
+            upgrade-report.txt 

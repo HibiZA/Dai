@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // PackageJSON represents the structure of a package.json file
@@ -90,4 +91,70 @@ func (p *PackageJSON) WriteToFile(dir string) error {
 	}
 
 	return nil
+}
+
+// CreateBackup creates a backup of the package.json file
+func CreateBackup(dir string) (string, error) {
+	originalPath := filepath.Join(dir, "package.json")
+	backupPath := filepath.Join(dir, "package.json.bak")
+
+	// Read the original file
+	content, err := os.ReadFile(originalPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read original package.json: %w", err)
+	}
+
+	// Write to backup file
+	if err := os.WriteFile(backupPath, content, 0644); err != nil {
+		return "", fmt.Errorf("failed to create backup file: %w", err)
+	}
+
+	return backupPath, nil
+}
+
+// GenerateDiff generates a diff between the original and modified package.json files
+func GenerateDiff(dir string, backupPath string) (string, error) {
+	currentPath := filepath.Join(dir, "package.json")
+
+	// Read the files
+	original, err := os.ReadFile(backupPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read backup file: %w", err)
+	}
+
+	current, err := os.ReadFile(currentPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read current file: %w", err)
+	}
+
+	// Create a simple diff output
+	originalLines := strings.Split(string(original), "\n")
+	currentLines := strings.Split(string(current), "\n")
+
+	var diff strings.Builder
+	diff.WriteString("--- package.json (original)\n")
+	diff.WriteString("+++ package.json (modified)\n")
+
+	// A very simple diff implementation - in a real system, you'd use a proper diff algorithm
+	// This just highlights added/removed lines for demo purposes
+	for i, line := range originalLines {
+		if i >= len(currentLines) {
+			diff.WriteString(fmt.Sprintf("- %s\n", line))
+			continue
+		}
+
+		if line != currentLines[i] {
+			diff.WriteString(fmt.Sprintf("- %s\n", line))
+			diff.WriteString(fmt.Sprintf("+ %s\n", currentLines[i]))
+		}
+	}
+
+	// Check for additional lines in current file
+	if len(currentLines) > len(originalLines) {
+		for i := len(originalLines); i < len(currentLines); i++ {
+			diff.WriteString(fmt.Sprintf("+ %s\n", currentLines[i]))
+		}
+	}
+
+	return diff.String(), nil
 }

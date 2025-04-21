@@ -18,15 +18,15 @@
 - [x] Set up OpenAI API integration (stub)
 - [x] Create prompt templates for upgrade rationales (stub)
 - [x] Implement `dai upgrade` command
-- [ ] Add functionality to apply version bumps
-- [ ] Create patch generation logic
-- [ ] Test AI-generated content quality
+- [x] Add functionality to apply version bumps
+- [x] Create patch generation logic
+- [x] Test AI-generated content quality
 
 ## Phase δ (1 week)
-- [ ] Create GitHub Action blueprint
-- [ ] Implement automated PR creation
-- [ ] Add AI-drafted PR description generation
-- [ ] Test end-to-end PR creation workflow
+- [x] Create GitHub Action blueprint
+- [x] Implement automated PR creation
+- [x] Add AI-drafted PR description generation
+- [x] Test end-to-end PR creation workflow
 
 ## Phase ε (Optional, 3-4 weeks)
 - [ ] Design web dashboard architecture
@@ -37,8 +37,8 @@
 
 ## Additional Tasks
 - [x] Write comprehensive documentation
-- [ ] Create installation scripts
+- [x] Create installation scripts
 - [x] Set up CI/CD pipeline
-- [ ] Prepare Homebrew formula
-- [ ] Create release automation for binaries (Linux, macOS, Windows) 
+- [x] Prepare Homebrew formula
+- [x] Create release automation for binaries (Linux, macOS, Windows) 
 - [x] Implement semver compatibility checking 
