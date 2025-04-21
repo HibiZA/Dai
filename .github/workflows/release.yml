@@ -105,13 +105,16 @@ jobs:
         run: |
           # Create the release
           gh release create ${{ steps.get_version.outputs.tag_version }} \
+            --repo ${{ github.repository }} \
             --title "Release ${{ steps.get_version.outputs.version }}" \
             --notes "Release ${{ steps.get_version.outputs.version }}"
           
           # Upload all assets
           cd dist
           for file in *.tar.gz *.zip checksums.txt; do
-            gh release upload ${{ steps.get_version.outputs.tag_version }} "$file" --clobber
+            gh release upload ${{ steps.get_version.outputs.tag_version }} "$file" \
+              --repo ${{ github.repository }} \
+              --clobber
           done
         env:
           GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
@@ -132,24 +135,24 @@ jobs:
           cat > homebrew-formula/dai.rb << EOF
           class Dai < Formula
             desc "AI-backed dependency upgrade advisor for package.json projects"
-            homepage "https://github.com/HibiZA/dai"
+            homepage "https://github.com/${{ github.repository }}"
             license "MIT"
             version "${VERSION}"
           
             if OS.mac?
               if Hardware::CPU.arm?
-                url "https://github.com/HibiZA/dai/releases/download/v${VERSION}/darwin_arm64.tar.gz"
+                url "https://github.com/${{ github.repository }}/releases/download/v${VERSION}/darwin_arm64.tar.gz"
                 sha256 "${DARWIN_ARM64_SHA}"
               else
-                url "https://github.com/HibiZA/dai/releases/download/v${VERSION}/darwin_amd64.tar.gz"
+                url "https://github.com/${{ github.repository }}/releases/download/v${VERSION}/darwin_amd64.tar.gz"
                 sha256 "${DARWIN_AMD64_SHA}"
               end
             elsif OS.linux?
               if Hardware::CPU.intel?
-                url "https://github.com/HibiZA/dai/releases/download/v${VERSION}/linux_amd64.tar.gz"
+                url "https://github.com/${{ github.repository }}/releases/download/v${VERSION}/linux_amd64.tar.gz"
                 sha256 "${LINUX_AMD64_SHA}"
               else
-                url "https://github.com/HibiZA/dai/releases/download/v${VERSION}/linux_arm64.tar.gz"
+                url "https://github.com/${{ github.repository }}/releases/download/v${VERSION}/linux_arm64.tar.gz"
                 sha256 "${LINUX_ARM64_SHA}"
               end
             end
