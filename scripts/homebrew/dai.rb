@@ -2,23 +2,23 @@ class Dai < Formula
   desc "AI-backed dependency upgrade advisor for package.json projects"
   homepage "https://github.com/HibiZA/dai"
   license "MIT"
-  version "0.1.0" # Will be updated by automation
+  version "0.1.0"
 
   if OS.mac?
     if Hardware::CPU.arm?
-      url "https://github.com/HibiZA/dai/releases/download/v0.1.0/dai_darwin_arm64.tar.gz"
-      sha256 "deadbeef" # Placeholder, will be updated by release automation
+      url "https://github.com/HibiZA/dai/releases/download/v0.1.0/darwin_arm64.tar.gz"
+      sha256 "REPLACE_WITH_ARM64_SHA256"
     else
-      url "https://github.com/HibiZA/dai/releases/download/v0.1.0/dai_darwin_amd64.tar.gz"
-      sha256 "deadbeef" # Placeholder, will be updated by release automation
+      url "https://github.com/HibiZA/dai/releases/download/v0.1.0/darwin_amd64.tar.gz"
+      sha256 "REPLACE_WITH_AMD64_SHA256"
     end
   elsif OS.linux?
     if Hardware::CPU.intel?
-      url "https://github.com/HibiZA/dai/releases/download/v0.1.0/dai_linux_amd64.tar.gz"
-      sha256 "deadbeef" # Placeholder, will be updated by release automation
+      url "https://github.com/HibiZA/dai/releases/download/v0.1.0/linux_amd64.tar.gz"
+      sha256 "REPLACE_WITH_LINUX_AMD64_SHA256"
     else
-      url "https://github.com/HibiZA/dai/releases/download/v0.1.0/dai_linux_arm64.tar.gz"
-      sha256 "deadbeef" # Placeholder, will be updated by release automation
+      url "https://github.com/HibiZA/dai/releases/download/v0.1.0/linux_arm64.tar.gz"
+      sha256 "REPLACE_WITH_LINUX_ARM64_SHA256"
     end
   end
 

@@ -4,6 +4,13 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  # Also allow manual triggering for testing
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (vX.Y.Z format)'
+        required: true
+        default: 'v0.1.0'
 
 jobs:
   release:
@@ -19,26 +26,161 @@ jobs:
         with:
           go-version: '1.21'
 
-      - name: Install GoReleaser
-        uses: goreleaser/goreleaser-action@v5
-        with:
-          install-only: true
-
-      - name: Extract tag version
-        id: tag
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-      - name: Run release script
+      - name: Get version
+        id: get_version
         run: |
-          ./scripts/release.sh ${{ steps.tag.outputs.version }}
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            echo "tag_version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            TAG=${GITHUB_REF#refs/tags/}
+            echo "version=${TAG}" >> $GITHUB_OUTPUT
+            echo "tag_version=${TAG}" >> $GITHUB_OUTPUT
+          fi
+          echo "version_number=${TAG#v}" >> $GITHUB_OUTPUT
+
+      - name: Create version.go file
+        run: |
+          mkdir -p cmd
+          cat > cmd/version.go << EOF
+          package cmd
+
+          // Version contains the current version of Dai CLI
+          var Version = "${{ steps.get_version.outputs.version }}"
+
+          // VersionCommand returns the version of Dai CLI
+          func VersionCommand() string {
+              return Version
+          }
+          EOF
+
+      - name: Build binaries
+        run: |
+          mkdir -p dist
+          
+          # Build for different platforms
+          GOOS=darwin GOARCH=amd64 go build -o dist/dai_darwin_amd64
+          GOOS=darwin GOARCH=arm64 go build -o dist/dai_darwin_arm64
+          GOOS=linux GOARCH=amd64 go build -o dist/dai_linux_amd64
+          GOOS=linux GOARCH=arm64 go build -o dist/dai_linux_arm64
+          GOOS=windows GOARCH=amd64 go build -o dist/dai_windows_amd64.exe
+          
+          # Create tarballs/zip files
+          cd dist
+          
+          tar -czf dai_darwin_amd64.tar.gz dai_darwin_amd64
+          tar -czf dai_darwin_arm64.tar.gz dai_darwin_arm64
+          tar -czf dai_linux_amd64.tar.gz dai_linux_amd64
+          tar -czf dai_linux_arm64.tar.gz dai_linux_arm64
+          zip dai_windows_amd64.zip dai_windows_amd64.exe
+          
+          # Rename binaries to "dai" for simplicity
+          mv dai_darwin_amd64 dai
+          tar -czf darwin_amd64.tar.gz dai
+          rm dai
+          
+          mv dai_darwin_arm64 dai
+          tar -czf darwin_arm64.tar.gz dai
+          rm dai
+          
+          mv dai_linux_amd64 dai
+          tar -czf linux_amd64.tar.gz dai
+          rm dai
+          
+          mv dai_linux_arm64 dai
+          tar -czf linux_arm64.tar.gz dai
+          rm dai
+          
+          mv dai_windows_amd64.exe dai.exe
+          zip windows_amd64.zip dai.exe
+          
+          # Generate checksums
+          sha256sum *.tar.gz *.zip > checksums.txt
+          
+          cd ..
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ steps.get_version.outputs.version }}
+          tag_name: ${{ steps.get_version.outputs.tag_version }}
+          draft: false
+          prerelease: false
+          files: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update Homebrew formula
+        run: |
+          # Get the SHA256 checksums
+          DARWIN_AMD64_SHA=$(grep darwin_amd64.tar.gz dist/checksums.txt | awk '{print $1}')
+          DARWIN_ARM64_SHA=$(grep darwin_arm64.tar.gz dist/checksums.txt | awk '{print $1}')
+          LINUX_AMD64_SHA=$(grep linux_amd64.tar.gz dist/checksums.txt | awk '{print $1}')
+          LINUX_ARM64_SHA=$(grep linux_arm64.tar.gz dist/checksums.txt | awk '{print $1}')
+          
+          VERSION="${{ steps.get_version.outputs.version_number }}"
+          VERSION="${VERSION#v}"  # Remove 'v' prefix if present
+          
+          # Create updated formula
+          mkdir -p homebrew-formula
+          cat > homebrew-formula/dai.rb << EOF
+          class Dai < Formula
+            desc "AI-backed dependency upgrade advisor for package.json projects"
+            homepage "https://github.com/HibiZA/dai"
+            license "MIT"
+            version "${VERSION}"
+          
+            if OS.mac?
+              if Hardware::CPU.arm?
+                url "https://github.com/HibiZA/dai/releases/download/v${VERSION}/darwin_arm64.tar.gz"
+                sha256 "${DARWIN_ARM64_SHA}"
+              else
+                url "https://github.com/HibiZA/dai/releases/download/v${VERSION}/darwin_amd64.tar.gz"
+                sha256 "${DARWIN_AMD64_SHA}"
+              end
+            elsif OS.linux?
+              if Hardware::CPU.intel?
+                url "https://github.com/HibiZA/dai/releases/download/v${VERSION}/linux_amd64.tar.gz"
+                sha256 "${LINUX_AMD64_SHA}"
+              else
+                url "https://github.com/HibiZA/dai/releases/download/v${VERSION}/linux_arm64.tar.gz"
+                sha256 "${LINUX_ARM64_SHA}"
+              end
+            end
+          
+            def install
+              bin.install "dai"
+            end
+          
+            test do
+              system "#{bin}/dai", "--version"
+            end
+          
+            def caveats
+              <<~EOS
+                To use Dai CLI, you may need to configure your API keys:
+                
+                For OpenAI integration:
+                $ export DAI_OPENAI_API_KEY=your_api_key
+                
+                For GitHub integration:
+                $ export DAI_GITHUB_TOKEN=your_github_token
+                
+                You can add these to your shell profile for permanent use.
+              EOS
+            end
+          end
+          EOF
 
       - name: Upload Homebrew formula
         uses: actions/upload-artifact@v4
         with:
           name: homebrew-formula
-          path: scripts/homebrew/dai.rb
+          path: homebrew-formula/dai.rb
 
   homebrew:
     needs: release
@@ -59,8 +201,9 @@ jobs:
       - name: Clone Homebrew tap repository
         run: |
           git clone https://${{ secrets.HOMEBREW_TAP_TOKEN }}@github.com/HibiZA/homebrew-dai.git
+          mkdir -p homebrew-dai/Formula
           cp dai.rb homebrew-dai/Formula/
           cd homebrew-dai
           git add Formula/dai.rb
-          git commit -m "Update dai to ${{ github.ref_name }}"
+          git commit -m "Update dai to ${{ steps.get_version.outputs.version }}"
           git push 
