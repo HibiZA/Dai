@@ -117,7 +117,7 @@ jobs:
               --clobber
           done
         env:
-          GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           
       - name: Update Homebrew formula
         run: |
