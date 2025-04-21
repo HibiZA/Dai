@@ -56,3 +56,38 @@ func FindPackageJSON() (string, error) {
 
 	return "", fmt.Errorf("package.json not found in current directory or any parent directory")
 }
+
+// UpdateDependency updates a dependency version in package.json
+func (p *PackageJSON) UpdateDependency(name, version string) bool {
+	// Check if it's a regular dependency
+	if _, exists := p.Dependencies[name]; exists {
+		p.Dependencies[name] = version
+		return true
+	}
+
+	// Check if it's a dev dependency
+	if _, exists := p.DevDependencies[name]; exists {
+		p.DevDependencies[name] = version
+		return true
+	}
+
+	return false
+}
+
+// WriteToFile writes the package.json content back to a file
+func (p *PackageJSON) WriteToFile(dir string) error {
+	packagePath := filepath.Join(dir, "package.json")
+
+	// Format the JSON with indentation for readability
+	data, err := json.MarshalIndent(p, "", "    ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal package.json: %w", err)
+	}
+
+	// Write the file
+	if err := os.WriteFile(packagePath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write package.json: %w", err)
+	}
+
+	return nil
+}

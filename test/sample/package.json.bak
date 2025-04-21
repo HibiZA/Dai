@@ -1,0 +1,21 @@
+{
+    "name": "dai-test-project",
+    "version": "1.0.0",
+    "description": "Test project for Dai CLI",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "start": "node index.js"
+    },
+    "dependencies": {
+        "express": "^4.17.1",
+        "react": "^17.0.2",
+        "lodash": "^4.17.21",
+        "axios": "^0.21.1"
+    },
+    "devDependencies": {
+        "jest": "^27.0.6",
+        "eslint": "^7.32.0",
+        "typescript": "^4.3.5"
+    }
+}

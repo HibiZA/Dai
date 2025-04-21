@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -48,5 +49,89 @@ func TestParsePackageJSON(t *testing.T) {
 		if pkg.DevDependencies[dep] != version {
 			t.Errorf("Expected devDependency %s to be %s, got %s", dep, version, pkg.DevDependencies[dep])
 		}
+	}
+}
+
+func TestUpdateDependency(t *testing.T) {
+	pkg := &PackageJSON{
+		Name:    "test-project",
+		Version: "1.0.0",
+		Dependencies: map[string]string{
+			"react": "^17.0.2",
+		},
+		DevDependencies: map[string]string{
+			"jest": "^27.0.6",
+		},
+	}
+
+	// Test updating a regular dependency
+	updated := pkg.UpdateDependency("react", "^18.0.0")
+	if !updated {
+		t.Errorf("UpdateDependency() returned false for existing dependency")
+	}
+	if pkg.Dependencies["react"] != "^18.0.0" {
+		t.Errorf("Expected dependency version to be ^18.0.0, got %s", pkg.Dependencies["react"])
+	}
+
+	// Test updating a dev dependency
+	updated = pkg.UpdateDependency("jest", "^28.0.0")
+	if !updated {
+		t.Errorf("UpdateDependency() returned false for existing dev dependency")
+	}
+	if pkg.DevDependencies["jest"] != "^28.0.0" {
+		t.Errorf("Expected dev dependency version to be ^28.0.0, got %s", pkg.DevDependencies["jest"])
+	}
+
+	// Test updating a non-existent dependency
+	updated = pkg.UpdateDependency("nonexistent", "^1.0.0")
+	if updated {
+		t.Errorf("UpdateDependency() returned true for non-existent dependency")
+	}
+}
+
+func TestWriteToFile(t *testing.T) {
+	// Create a temporary directory for testing
+	tmpDir, err := os.MkdirTemp("", "pkg-json-test")
+	if err != nil {
+		t.Fatalf("Failed to create temp directory: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create a package.json object
+	pkg := &PackageJSON{
+		Name:    "test-project",
+		Version: "1.0.0",
+		Dependencies: map[string]string{
+			"react": "^17.0.2",
+		},
+		DevDependencies: map[string]string{
+			"jest": "^27.0.6",
+		},
+	}
+
+	// Write it to the temp directory
+	err = pkg.WriteToFile(tmpDir)
+	if err != nil {
+		t.Fatalf("WriteToFile() failed: %v", err)
+	}
+
+	// Read it back
+	readPkg, err := ParsePackageJSON(tmpDir)
+	if err != nil {
+		t.Fatalf("Failed to parse written package.json: %v", err)
+	}
+
+	// Verify contents
+	if readPkg.Name != pkg.Name {
+		t.Errorf("Expected name to be %s, got %s", pkg.Name, readPkg.Name)
+	}
+	if readPkg.Version != pkg.Version {
+		t.Errorf("Expected version to be %s, got %s", pkg.Version, readPkg.Version)
+	}
+	if readPkg.Dependencies["react"] != pkg.Dependencies["react"] {
+		t.Errorf("Expected react version to be %s, got %s", pkg.Dependencies["react"], readPkg.Dependencies["react"])
+	}
+	if readPkg.DevDependencies["jest"] != pkg.DevDependencies["jest"] {
+		t.Errorf("Expected jest version to be %s, got %s", pkg.DevDependencies["jest"], readPkg.DevDependencies["jest"])
 	}
 }
