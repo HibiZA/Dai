@@ -1,54 +1,137 @@
-# Dai CLI Homebrew Tap
+# Dai CLI - AI‑Backed Dependency Upgrade Advisor
 
-This repository contains Homebrew formulae for [Dai CLI](https://github.com/HibiZA/dai).
+Dai CLI automates dependency maintenance by scanning your project, detecting outdated packages, and using AI to draft upgrade rationales and PRs.
 
-## Usage
+## Installation
 
-### Using Homebrew (macOS)
-
-> **Note:** Before using Homebrew, make sure the Homebrew tap repository has been created at https://github.com/HibiZA/homebrew-dai
+### macOS (Homebrew)
 
 ```bash
-# Install from Homebrew
-brew tap HibiZA/dai
-brew install dai
-```
-
-### Installing from a Local Formula (Development)
-
-During development or before an official release is published:
-
-```bash
-# Install from the local formula
-cd ~/Documents/Project/Dai
-brew install --build-from-source $(pwd)/scripts/homebrew/dai.rb
+brew install HibiZA/tap/dai
 ```
 
 ### Direct Installation (macOS/Linux)
 
-## Local Development
-
-For local development and testing, you can use:
-
 ```bash
-# Install from a local tap
-brew install --build-from-source Formula/dai.rb
+# For latest stable release
+curl -fsSL https://raw.githubusercontent.com/HibiZA/dai/main/scripts/install.sh | bash
+
+# For specific version
+curl -fsSL https://raw.githubusercontent.com/HibiZA/dai/main/scripts/install.sh | bash -s -- v0.1.0
 ```
 
-## Available Formulae
+### Windows
 
-- `dai`: AI-backed dependency upgrade advisor for package.json projects
+Download the latest release from [GitHub Releases](https://github.com/HibiZA/dai/releases) and add the executable to your PATH.
 
-## Development
+## Configuration
 
-To update the formula after a new release:
+### Setting API Keys
 
-1. Update the version in `Formula/dai.rb`
-2. Update the SHA256 checksums for each platform
-3. Commit and push the changes
+Dai CLI requires API keys for full functionality:
 
-This is typically handled automatically by the GitHub Actions release workflow.
+#### Using the config command
+
+```bash
+# Set OpenAI API key
+dai config --set openai --openai-key YOUR_API_KEY
+
+# Set GitHub token
+dai config --set github --github-token YOUR_GITHUB_TOKEN
+```
+
+#### Using environment variables
+
+```bash
+# Set environment variables permanently in your shell profile (.bashrc, .zshrc, etc.)
+export DAI_OPENAI_API_KEY="your-openai-api-key"
+export DAI_GITHUB_TOKEN="your-github-token"
+```
+
+#### View current configuration
+
+```bash
+dai config --list
+```
+
+## Usage
+
+### Scanning for Vulnerabilities
+
+```bash
+# Scan all dependencies (including dev)
+dai scan
+
+# Scan only production dependencies
+dai scan --dev=false
+
+# Output in table format
+dai scan --format table
+```
+
+### Upgrading Dependencies
+
+```bash
+# Upgrade a specific package
+dai upgrade react
+
+# Upgrade multiple packages
+dai upgrade react,react-dom,redux
+
+# Upgrade all dependencies
+dai upgrade --all
+
+# Preview upgrades without applying changes
+dai upgrade --all --dry-run
+
+# Apply upgrades and create a PR
+dai upgrade --all --apply --pr
+```
+
+## Command Reference
+
+### General Commands
+
+```bash
+# Show version
+dai version
+
+# Show help
+dai --help
+```
+
+### Scan Command
+
+```bash
+# Show scan command help
+dai scan --help
+```
+
+### Upgrade Command
+
+```bash
+# Show upgrade command help
+dai upgrade --help
+```
+
+### Config Command
+
+```bash
+# Show config command help
+dai config --help
+```
+
+## Getting Help
+
+For more detailed information on any command, use the `--help` flag:
+
+```bash
+dai --help
+dai scan --help
+dai upgrade --help
+dai config --help
+```
 
 ## License
 
-This repository is available under the same license as [Dai CLI](https://github.com/HibiZA/dai).
+[MIT License](LICENSE)
