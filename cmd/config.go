@@ -17,14 +17,16 @@ var (
 	listConfig   bool
 	openaiKeyArg string
 	githubKeyArg string
+	nvdKeyArg    string
 )
 
 func init() {
 	// Add config flags
-	configCmd.Flags().StringVarP(&setKey, "set", "s", "", "Set a config key (openai, github)")
+	configCmd.Flags().StringVarP(&setKey, "set", "s", "", "Set a config key (openai, github, nvd)")
 	configCmd.Flags().BoolVarP(&listConfig, "list", "l", false, "List current configuration")
 	configCmd.Flags().StringVar(&openaiKeyArg, "openai-key", "", "OpenAI API key to set")
 	configCmd.Flags().StringVar(&githubKeyArg, "github-token", "", "GitHub token to set")
+	configCmd.Flags().StringVar(&nvdKeyArg, "nvd-api-key", "", "NVD API key to set")
 
 	// Set custom help function
 	configCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
@@ -43,7 +45,7 @@ func displayConfigHelp(cmd *cobra.Command) {
 	fmt.Printf("%s - %s\n\n", style.Title("Config Command"), style.Subtitle("Configuration Management"))
 
 	// Description
-	fmt.Println(style.Info("Set and manage Dai CLI configuration options including API keys for OpenAI and GitHub."))
+	fmt.Println(style.Info("Set and manage Dai CLI configuration options including API keys for OpenAI, GitHub, and NVD."))
 	fmt.Println()
 
 	// Usage section
@@ -62,11 +64,14 @@ func displayConfigHelp(cmd *cobra.Command) {
 		style.Highlight("-l, --list"),
 		style.Subtitle("List current configuration"))
 	fmt.Printf("  %-30s %s\n",
+		style.Highlight("--nvd-api-key string"),
+		style.Subtitle("NVD API key to set"))
+	fmt.Printf("  %-30s %s\n",
 		style.Highlight("--openai-key string"),
 		style.Subtitle("OpenAI API key to set"))
 	fmt.Printf("  %-30s %s\n\n",
 		style.Highlight("-s, --set string"),
-		style.Subtitle("Set a config key (openai, github)"))
+		style.Subtitle("Set a config key (openai, github, nvd)"))
 
 	// Examples section
 	fmt.Println(style.Title("Examples:"))
@@ -76,6 +81,9 @@ func displayConfigHelp(cmd *cobra.Command) {
 	fmt.Printf("  %s\n", style.Subtitle("# Set GitHub token"))
 	fmt.Printf("  %s\n\n", style.Highlight("dai config --set github --github-token YOUR_GITHUB_TOKEN"))
 
+	fmt.Printf("  %s\n", style.Subtitle("# Set NVD API key"))
+	fmt.Printf("  %s\n\n", style.Highlight("dai config --set nvd --nvd-api-key YOUR_NVD_API_KEY"))
+
 	fmt.Printf("  %s\n", style.Subtitle("# List current configuration"))
 	fmt.Printf("  %s\n", style.Highlight("dai config --list"))
 }
@@ -83,7 +91,7 @@ func displayConfigHelp(cmd *cobra.Command) {
 var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Configure API keys and other settings",
-	Long:  `Configure Dai CLI options including API keys for OpenAI and GitHub.`,
+	Long:  `Configure Dai CLI options including API keys for OpenAI, GitHub, and NVD.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if listConfig {
 			displayConfiguration()
@@ -106,8 +114,15 @@ var configCmd = &cobra.Command{
 				}
 				saveAPIKey("github", githubKeyArg)
 
+			case "nvd":
+				if nvdKeyArg == "" {
+					fmt.Println(style.Error("Error:"), "NVD API key is required. Use --nvd-api-key flag.")
+					return
+				}
+				saveAPIKey("nvd", nvdKeyArg)
+
 			default:
-				fmt.Println(style.Error("Error:"), "Unknown key. Supported keys: openai, github")
+				fmt.Println(style.Error("Error:"), "Unknown key. Supported keys: openai, github, nvd")
 			}
 			return
 		}
@@ -147,11 +162,23 @@ func displayConfiguration() {
 			style.Warning("Not set"))
 	}
 
+	// Display NVD API key status
+	if cfg.HasNVDApiKey() {
+		fmt.Printf("%s: %s\n",
+			style.Package("NVD API Key"),
+			style.Success("Set ✓"))
+	} else {
+		fmt.Printf("%s: %s\n",
+			style.Package("NVD API Key"),
+			style.Warning("Not set"))
+	}
+
 	// Display environment variables
 	fmt.Println()
 	fmt.Println(style.Subtitle("Environment Variables:"))
 	fmt.Printf("  %s=%s\n", style.Info("DAI_OPENAI_API_KEY"), maskSecret(os.Getenv("DAI_OPENAI_API_KEY")))
 	fmt.Printf("  %s=%s\n", style.Info("DAI_GITHUB_TOKEN"), maskSecret(os.Getenv("DAI_GITHUB_TOKEN")))
+	fmt.Printf("  %s=%s\n", style.Info("DAI_NVD_API_KEY"), maskSecret(os.Getenv("DAI_NVD_API_KEY")))
 
 	// Display config file information
 	configDir := getConfigDir()
@@ -191,6 +218,8 @@ func SaveAPIKey(keyType, value string) error {
 		envName = "DAI_OPENAI_API_KEY"
 	case "github":
 		envName = "DAI_GITHUB_TOKEN"
+	case "nvd":
+		envName = "DAI_NVD_API_KEY"
 	default:
 		return fmt.Errorf("unknown key type: %s", keyType)
 	}
@@ -251,6 +280,8 @@ func saveAPIKey(keyType, value string) {
 		envName = "DAI_OPENAI_API_KEY"
 	case "github":
 		envName = "DAI_GITHUB_TOKEN"
+	case "nvd":
+		envName = "DAI_NVD_API_KEY"
 	}
 
 	// Get the config file path for display

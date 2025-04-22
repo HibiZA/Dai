@@ -124,12 +124,47 @@ func checkRequiredKeys() bool {
 		}
 	}
 
+	// Check NVD API key
+	if !cfg.HasNVDApiKey() {
+		fmt.Println(style.Warning("NVD API key not found. A key is recommended to avoid NVD API rate limits."))
+		fmt.Println(style.Info("Would you like to set an NVD API key now? (y/n):"))
+
+		reader := bufio.NewReader(os.Stdin)
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+
+		if strings.ToLower(input) == "y" || strings.ToLower(input) == "yes" {
+			fmt.Println(style.Info("Enter your NVD API key (will be hidden):"))
+			fmt.Print("> ")
+			token, _ := reader.ReadString('\n')
+			token = strings.TrimSpace(token)
+
+			if token != "" {
+				// Use the config command directly since saveAPIKey is not exported
+				err := saveNVDApiKey(token)
+				if err != nil {
+					fmt.Println(style.Error("Error:"), "Failed to save NVD API key:", err)
+				}
+			} else {
+				fmt.Println(style.Warning("No API key provided. Scanning may hit API rate limits."))
+				fmt.Println(style.Info("You can set a key later with: dai config --set nvd --nvd-api-key YOUR_KEY"))
+			}
+		} else {
+			fmt.Println(style.Warning("Proceeding without NVD API key. Scanning may hit API rate limits."))
+		}
+	}
+
 	return true
 }
 
 // saveGitHubToken is a helper function to save the GitHub token
 func saveGitHubToken(token string) error {
 	return SaveAPIKey("github", token)
+}
+
+// saveNVDApiKey is a helper function to save the NVD API key
+func saveNVDApiKey(token string) error {
+	return SaveAPIKey("nvd", token)
 }
 
 func scanProject() {
