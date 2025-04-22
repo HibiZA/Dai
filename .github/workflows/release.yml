@@ -44,20 +44,10 @@ jobs:
             echo "version_number=${TAG#v}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create version.go file
+      - name: Update version in root.go
         run: |
-          mkdir -p cmd
-          cat > cmd/version.go << EOF
-          package cmd
-
-          // Version contains the current version of Dai CLI
-          var Version = "${{ steps.get_version.outputs.version }}"
-
-          // VersionCommand returns the version of Dai CLI
-          func VersionCommand() string {
-              return Version
-          }
-          EOF
+          # Update the version in the existing file instead of creating a new one
+          sed -i "s/var Version = \"[^\"]*\"/var Version = \"${{ steps.get_version.outputs.version }}\"/" cmd/root.go
 
       - name: Build binaries
         run: |
