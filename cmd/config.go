@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/HibiZA/dai/pkg/config"
@@ -250,5 +251,22 @@ func getConfigDir() string {
 		// Fallback to current directory if home dir can't be determined
 		return ".dai"
 	}
+
+	// Check for XDG_CONFIG_HOME environment variable first (Linux/macOS standard)
+	if xdgConfigHome := os.Getenv("XDG_CONFIG_HOME"); xdgConfigHome != "" {
+		return filepath.Join(xdgConfigHome, "dai")
+	}
+
+	// On macOS and Linux, use ~/.config/dai
+	if runtime.GOOS == "linux" || runtime.GOOS == "darwin" {
+		return filepath.Join(homeDir, ".config", "dai")
+	}
+
+	// On Windows, use %APPDATA%\dai
+	if runtime.GOOS == "windows" {
+		return filepath.Join(homeDir, "AppData", "Roaming", "dai")
+	}
+
+	// Fallback to the original .dai directory for backward compatibility
 	return filepath.Join(homeDir, ".dai")
 }

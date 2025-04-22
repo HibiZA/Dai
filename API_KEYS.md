@@ -85,7 +85,7 @@ dai config --set openai --openai-key sk-your-openai-api-key
 dai config --set github --github-token ghp_your-github-token
 ```
 
-This stores your API keys in a secure configuration file:
+This stores your API keys in a secure configuration file located at:
 - Linux/macOS: `~/.config/dai/config.env`
 - Windows: `%APPDATA%\dai\config.env`
 

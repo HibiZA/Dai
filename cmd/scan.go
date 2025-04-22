@@ -1,9 +1,12 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"os"
+	"strings"
 
+	"github.com/HibiZA/dai/pkg/config"
 	"github.com/HibiZA/dai/pkg/parser"
 	"github.com/HibiZA/dai/pkg/security"
 	"github.com/HibiZA/dai/pkg/style"
@@ -18,6 +21,7 @@ var (
 func init() {
 	scanCmd.Flags().StringVarP(&outputFormat, "format", "f", "text", "Output format: text or table")
 	scanCmd.Flags().BoolVarP(&scanDev, "dev", "d", true, "Scan dev dependencies")
+	scanCmd.Flags().Bool("skip-key-check", false, "Skip API key validation and prompts")
 
 	// Set custom help function
 	scanCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
@@ -52,6 +56,9 @@ func displayScanHelp(cmd *cobra.Command) {
 	fmt.Printf("  %-20s %s\n",
 		style.Highlight("-f, --format string"),
 		style.Subtitle("Output format: text or table (default \"text\")"))
+	fmt.Printf("  %-20s %s\n",
+		style.Highlight("--skip-key-check"),
+		style.Subtitle("Skip API key validation and prompts"))
 	fmt.Printf("  %-20s %s\n\n",
 		style.Highlight("-h, --help"),
 		style.Subtitle("Help for scan command"))
@@ -73,8 +80,47 @@ var scanCmd = &cobra.Command{
 	Short: "Scan the current project for outdated dependencies and security vulnerabilities",
 	Long:  `Scan command parses your package.json (and lockfile) to check dependencies for security vulnerabilities using multiple data sources.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		// Check and prompt for required API keys if not set
+		skipKeyCheck, _ := cmd.Flags().GetBool("skip-key-check")
+		if !skipKeyCheck && !checkRequiredKeys() {
+			return
+		}
+
 		scanProject()
 	},
+}
+
+// checkRequiredKeys checks if required API keys are set and prompts user to enter them if not
+func checkRequiredKeys() bool {
+	cfg := config.LoadConfig()
+
+	// Check GitHub token (most important for scanning)
+	if !cfg.HasGitHubToken() {
+		fmt.Println(style.Warning("GitHub token not found. A token is recommended to avoid GitHub API rate limits."))
+		fmt.Println(style.Info("Would you like to set a GitHub token now? (y/n):"))
+
+		reader := bufio.NewReader(os.Stdin)
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+
+		if strings.ToLower(input) == "y" || strings.ToLower(input) == "yes" {
+			fmt.Println(style.Info("Enter your GitHub token (will be hidden):"))
+			fmt.Print("> ")
+			token, _ := reader.ReadString('\n')
+			token = strings.TrimSpace(token)
+
+			if token != "" {
+				saveAPIKey("github", token)
+			} else {
+				fmt.Println(style.Warning("No token provided. Scanning may hit API rate limits."))
+				fmt.Println(style.Info("You can set a token later with: dai config --set github --github-token YOUR_TOKEN"))
+			}
+		} else {
+			fmt.Println(style.Warning("Proceeding without GitHub token. Scanning may hit API rate limits."))
+		}
+	}
+
+	return true
 }
 
 func scanProject() {

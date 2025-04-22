@@ -7,9 +7,9 @@ import (
 // Constants for environment variables
 const (
 	// API Keys
-	EnvOpenAIKey   = "OPENAI_API_KEY"
-	EnvGitHubToken = "GITHUB_TOKEN"
-	EnvNVDApiKey   = "NVD_API_KEY"
+	EnvOpenAIKey   = "DAI_OPENAI_API_KEY"
+	EnvGitHubToken = "DAI_GITHUB_TOKEN"
+	EnvNVDApiKey   = "DAI_NVD_API_KEY"
 
 	// Configuration
 	EnvLogLevel = "DAI_LOG_LEVEL"
@@ -30,7 +30,7 @@ type Config struct {
 
 // LoadConfig loads configuration from environment variables
 func LoadConfig() *Config {
-	return &Config{
+	config := &Config{
 		// API Keys
 		OpenAIApiKey: os.Getenv(EnvOpenAIKey),
 		GitHubToken:  os.Getenv(EnvGitHubToken),
@@ -40,6 +40,19 @@ func LoadConfig() *Config {
 		LogLevel: getEnvWithDefault(EnvLogLevel, "info"),
 		CacheDir: getEnvWithDefault(EnvCacheDir, "./.dai-cache"),
 	}
+
+	// For backward compatibility, check non-prefixed keys if prefixed ones are empty
+	if config.OpenAIApiKey == "" {
+		config.OpenAIApiKey = os.Getenv("OPENAI_API_KEY")
+	}
+	if config.GitHubToken == "" {
+		config.GitHubToken = os.Getenv("GITHUB_TOKEN")
+	}
+	if config.NVDApiKey == "" {
+		config.NVDApiKey = os.Getenv("NVD_API_KEY")
+	}
+
+	return config
 }
 
 // getEnvWithDefault gets an environment variable or returns a default value

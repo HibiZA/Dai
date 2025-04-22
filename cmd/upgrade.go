@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -41,6 +42,7 @@ func init() {
 	upgradeCmd.Flags().StringVar(&registryURLFlag, "registry", "", "NPM registry URL (defaults to https://registry.npmjs.org)")
 	upgradeCmd.Flags().BoolVar(&simulateFlag, "simulate", false, "Simulate upgrades (don't actually check npm registry)")
 	upgradeCmd.Flags().BoolVar(&testAIFlag, "test-ai", false, "Test AI-generated content quality for specific packages")
+	upgradeCmd.Flags().Bool("skip-key-check", false, "Skip API key validation and prompts")
 
 	// Set custom help function
 	upgradeCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
@@ -83,6 +85,7 @@ func displayUpgradeHelp(cmd *cobra.Command) {
 		{"-p, --pr", "Create a pull request with the changes"},
 		{"--registry string", "NPM registry URL (defaults to https://registry.npmjs.org)"},
 		{"--simulate", "Simulate upgrades (don't actually check npm registry)"},
+		{"--skip-key-check", "Skip API key validation and prompts"},
 		{"--test-ai", "Test AI-generated content quality for specific packages"},
 		{"-t, --github-token string", "GitHub token (or set DAI_GITHUB_TOKEN env var)"},
 		{"-h, --help", "Help for upgrade command"},
@@ -125,6 +128,12 @@ var upgradeCmd = &cobra.Command{
 			githubToken = os.Getenv("DAI_GITHUB_TOKEN")
 		}
 
+		// Check and prompt for required API keys if not set
+		skipKeyCheck, _ := cmd.Flags().GetBool("skip-key-check")
+		if !skipKeyCheck && !checkRequiredUpgradeKeys() {
+			return
+		}
+
 		// If test-ai flag is set, run AI testing instead of normal upgrade
 		if testAIFlag {
 			testAIContentQuality(args)
@@ -140,6 +149,84 @@ var upgradeCmd = &cobra.Command{
 
 		upgradePackages(packages)
 	},
+}
+
+// checkRequiredUpgradeKeys checks if required API keys are set and prompts user to enter them if not
+func checkRequiredUpgradeKeys() bool {
+	cfg := config.LoadConfig()
+	reader := bufio.NewReader(os.Stdin)
+
+	// Check GitHub token
+	if !cfg.HasGitHubToken() && createPRFlag {
+		fmt.Println(style.Warning("GitHub token is required for creating PRs."))
+		fmt.Println(style.Info("Would you like to set a GitHub token now? (y/n):"))
+
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+
+		if strings.ToLower(input) == "y" || strings.ToLower(input) == "yes" {
+			fmt.Println(style.Info("Enter your GitHub token (will be hidden):"))
+			fmt.Print("> ")
+			token, _ := reader.ReadString('\n')
+			token = strings.TrimSpace(token)
+
+			if token != "" {
+				saveAPIKey("github", token)
+				githubToken = token // Set for current session
+			} else {
+				fmt.Println(style.Error("No token provided. Cannot create PR."))
+				return false
+			}
+		} else {
+			fmt.Println(style.Error("GitHub token is required for PR creation. Aborting."))
+			return false
+		}
+	} else if !cfg.HasGitHubToken() {
+		fmt.Println(style.Warning("GitHub token not found. This may affect API rate limits."))
+		fmt.Println(style.Info("Would you like to set a GitHub token now? (y/n):"))
+
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+
+		if strings.ToLower(input) == "y" || strings.ToLower(input) == "yes" {
+			fmt.Println(style.Info("Enter your GitHub token:"))
+			fmt.Print("> ")
+			token, _ := reader.ReadString('\n')
+			token = strings.TrimSpace(token)
+
+			if token != "" {
+				saveAPIKey("github", token)
+				githubToken = token // Set for current session
+			}
+		}
+	}
+
+	// Check OpenAI API key if not using simulation
+	if !cfg.HasOpenAIKey() && !simulateFlag {
+		fmt.Println(style.Warning("OpenAI API key not found. This is required for AI-generated upgrade rationales."))
+		fmt.Println(style.Info("Would you like to set an OpenAI API key now? (y/n):"))
+
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+
+		if strings.ToLower(input) == "y" || strings.ToLower(input) == "yes" {
+			fmt.Println(style.Info("Enter your OpenAI API key:"))
+			fmt.Print("> ")
+			key, _ := reader.ReadString('\n')
+			key = strings.TrimSpace(key)
+
+			if key != "" {
+				saveAPIKey("openai", key)
+				openaiAPIKey = key // Set for current session
+			} else {
+				fmt.Println(style.Warning("No key provided. Will proceed without AI-generated rationales."))
+			}
+		} else {
+			fmt.Println(style.Warning("Proceeding without AI-generated rationales."))
+		}
+	}
+
+	return true
 }
 
 func upgradePackages(packages []string) {
