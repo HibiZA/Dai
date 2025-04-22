@@ -7,7 +7,7 @@ Dai CLI automates dependency maintenance by scanning your project, detecting out
 ### macOS (Homebrew)
 
 ```bash
-brew install HibiZA/tap/dai
+brew install HibiZA/dai/dai-cli
 ```
 
 ### Direct Installation (macOS/Linux)

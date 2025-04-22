@@ -13,13 +13,19 @@ The recommended way to install Dai CLI on macOS is using Homebrew:
 brew tap HibiZA/dai
 
 # Install Dai CLI
-brew install dai
+brew install dai-cli
+```
+
+Alternatively, you can use the single command:
+
+```bash
+brew install HibiZA/dai/dai-cli
 ```
 
 To update Dai CLI to the latest version:
 
 ```bash
-brew upgrade dai
+brew upgrade dai-cli
 ```
 
 ### Direct Installation Script (macOS/Linux)
@@ -191,7 +197,7 @@ To uninstall Dai CLI:
 
 ### macOS (Homebrew)
 ```bash
-brew uninstall dai
+brew uninstall dai-cli
 ```
 
 ### Linux/macOS (Manual Installation)

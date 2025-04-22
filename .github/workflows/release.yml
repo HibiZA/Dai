@@ -133,8 +133,8 @@ jobs:
           
           # Create updated formula
           mkdir -p homebrew-formula
-          cat > homebrew-formula/dai.rb << EOF
-          class Dai < Formula
+          cat > homebrew-formula/dai-cli.rb << EOF
+          class DaiCli < Formula
             desc "AI-backed dependency upgrade advisor for package.json projects"
             homepage "https://github.com/${{ github.repository }}"
             license "MIT"
@@ -159,11 +159,11 @@ jobs:
             end
           
             def install
-              bin.install "dai"
+              bin.install "dai-cli"
             end
           
             test do
-              system "#{bin}/dai", "--version"
+              system "#{bin}/dai-cli", "--version"
             end
           
             def caveats
@@ -186,7 +186,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: homebrew-formula
-          path: homebrew-formula/dai.rb
+          path: homebrew-formula/dai-cli.rb
 
   homebrew:
     needs: release
@@ -217,8 +217,8 @@ jobs:
         run: |
           git clone https://${{ secrets.HOMEBREW_TAP_TOKEN }}@github.com/HibiZA/homebrew-dai.git
           mkdir -p homebrew-dai/Formula
-          cp dai.rb homebrew-dai/Formula/
+          cp dai-cli.rb homebrew-dai/Formula/
           cd homebrew-dai
-          git add Formula/dai.rb
-          git commit -m "Update dai to ${{ steps.get_tag.outputs.version }}"
+          git add Formula/dai-cli.rb
+          git commit -m "Update dai-cli to ${{ steps.get_tag.outputs.version }}"
           git push 
