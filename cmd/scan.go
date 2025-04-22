@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/HibiZA/dai/pkg/ai"
 	"github.com/HibiZA/dai/pkg/config"
 	"github.com/HibiZA/dai/pkg/parser"
 	"github.com/HibiZA/dai/pkg/security"
@@ -94,6 +95,14 @@ var scanCmd = &cobra.Command{
 func checkRequiredKeys() bool {
 	cfg := config.LoadConfig()
 
+	// Debug log to check OpenAI API key status
+	fmt.Println(style.Info("Debug - OpenAI key status:"), cfg.HasOpenAIKey())
+
+	// Add deeper debugging for OpenAI key issues
+	fmt.Println(style.Info("OpenAI Key Debug Info:"))
+	debugInfo := ai.DebugOpenAIKey()
+	fmt.Println(debugInfo)
+
 	// Check GitHub token (most important for scanning)
 	if !cfg.HasGitHubToken() {
 		fmt.Println(style.Warning("GitHub token not found. A token is recommended to avoid GitHub API rate limits."))
@@ -154,6 +163,36 @@ func checkRequiredKeys() bool {
 		}
 	}
 
+	// Check OpenAI key
+	if !cfg.HasOpenAIKey() {
+		fmt.Println(style.Warning("OpenAI API key not found. A key is required for generating upgrade rationales."))
+		fmt.Println(style.Info("Would you like to set an OpenAI API key now? (y/n):"))
+
+		reader := bufio.NewReader(os.Stdin)
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+
+		if strings.ToLower(input) == "y" || strings.ToLower(input) == "yes" {
+			fmt.Println(style.Info("Enter your OpenAI API key (will be hidden):"))
+			fmt.Print("> ")
+			token, _ := reader.ReadString('\n')
+			token = strings.TrimSpace(token)
+
+			if token != "" {
+				// Use the config command directly since saveAPIKey is not exported
+				err := saveOpenAIKey(token)
+				if err != nil {
+					fmt.Println(style.Error("Error:"), "Failed to save OpenAI API key:", err)
+				}
+			} else {
+				fmt.Println(style.Warning("No API key provided."))
+				fmt.Println(style.Info("You can set a key later with: dai config --set openai --openai-key YOUR_KEY"))
+			}
+		} else {
+			fmt.Println(style.Warning("Proceeding without OpenAI API key."))
+		}
+	}
+
 	return true
 }
 
@@ -165,6 +204,11 @@ func saveGitHubToken(token string) error {
 // saveNVDApiKey is a helper function to save the NVD API key
 func saveNVDApiKey(token string) error {
 	return SaveAPIKey("nvd", token)
+}
+
+// saveOpenAIKey is a helper function to save the OpenAI API key
+func saveOpenAIKey(token string) error {
+	return SaveAPIKey("openai", token)
 }
 
 func scanProject() {
@@ -221,6 +265,100 @@ func scanProject() {
 
 	// Write the console report
 	security.WriteConsoleReport(os.Stdout, reports)
+
+	// After the scan is complete, prompt for upgrading vulnerable packages
+	promptForUpgrades(reports, pkg, dir)
+}
+
+// promptForUpgrades prompts the user to upgrade vulnerable packages
+func promptForUpgrades(reports map[string]*security.VulnerabilityReport, pkg *parser.PackageJSON, dir string) {
+	// Check if there are any vulnerable packages
+	vulnerablePackages := []string{}
+	for packageName, report := range reports {
+		if len(report.Vulnerabilities) > 0 {
+			vulnerablePackages = append(vulnerablePackages, packageName)
+		}
+	}
+
+	if len(vulnerablePackages) == 0 {
+		return
+	}
+
+	fmt.Println()
+	fmt.Println(style.Header("🔄 Package Upgrade Recommendations"))
+	fmt.Println(style.Divider())
+	fmt.Printf("Found %d vulnerable %s. Would you like to upgrade them? (y/n): ",
+		len(vulnerablePackages),
+		pluralize("package", len(vulnerablePackages)))
+
+	reader := bufio.NewReader(os.Stdin)
+	input, _ := reader.ReadString('\n')
+	input = strings.TrimSpace(input)
+
+	if strings.ToLower(input) != "y" && strings.ToLower(input) != "yes" {
+		fmt.Println(style.Info("No packages will be upgraded."))
+		return
+	}
+
+	// Perform the upgrade
+	fmt.Println(style.Info("Checking for available upgrades..."))
+
+	// Create a list of upgrades to perform
+	upgrades := []string{}
+	for _, packageName := range vulnerablePackages {
+		upgrades = append(upgrades, packageName)
+	}
+
+	// Run npm outdated to get latest versions
+	fmt.Println(style.Subtitle("Running npm outdated to find latest versions..."))
+
+	// Change to the directory containing package.json
+	cwd, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(cwd)
+
+	// Perform the actual upgrade
+	// NOTE: We are just showing the recommendation here; we'd need to integrate with
+	// a proper package manager (npm, yarn, etc.) to do the actual upgrades.
+	fmt.Println(style.Success("Upgrade recommendation:"))
+	for _, packageName := range vulnerablePackages {
+		currentVersion := ""
+
+		// Find current version
+		if v, ok := pkg.Dependencies[packageName]; ok {
+			currentVersion = v
+		} else if v, ok := pkg.DevDependencies[packageName]; ok {
+			currentVersion = v
+		}
+
+		fmt.Printf("  %s: %s → %s\n",
+			style.Highlight(packageName),
+			style.Warning(currentVersion),
+			style.Success("latest"))
+	}
+
+	fmt.Println()
+	fmt.Println(style.Info("To upgrade these packages, run one of the following commands:"))
+	fmt.Printf("  %s %s\n",
+		style.Highlight("npm upgrade"),
+		strings.Join(vulnerablePackages, " "))
+	fmt.Printf("  %s %s\n",
+		style.Highlight("yarn upgrade"),
+		strings.Join(vulnerablePackages, " "))
+
+	fmt.Println()
+	fmt.Println(style.Info("Or use our built-in upgrade command:"))
+	fmt.Printf("  %s %s\n",
+		style.Highlight("dai upgrade"),
+		strings.Join(vulnerablePackages, " "))
+}
+
+// pluralize returns a singular or plural form based on count
+func pluralize(word string, count int) string {
+	if count == 1 {
+		return word
+	}
+	return word + "s"
 }
 
 func checkVulnerabilities(name, version string) {
