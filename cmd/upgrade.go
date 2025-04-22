@@ -171,7 +171,10 @@ func checkRequiredUpgradeKeys() bool {
 			token = strings.TrimSpace(token)
 
 			if token != "" {
-				saveAPIKey("github", token)
+				if err := SaveAPIKey("github", token); err != nil {
+					fmt.Printf("%s %v\n", style.Error("Error:"), err)
+					return false
+				}
 				githubToken = token // Set for current session
 			} else {
 				fmt.Println(style.Error("No token provided. Cannot create PR."))
@@ -195,7 +198,10 @@ func checkRequiredUpgradeKeys() bool {
 			token = strings.TrimSpace(token)
 
 			if token != "" {
-				saveAPIKey("github", token)
+				if err := SaveAPIKey("github", token); err != nil {
+					fmt.Printf("%s %v\n", style.Error("Error:"), err)
+					return false
+				}
 				githubToken = token // Set for current session
 			}
 		}
@@ -216,7 +222,10 @@ func checkRequiredUpgradeKeys() bool {
 			key = strings.TrimSpace(key)
 
 			if key != "" {
-				saveAPIKey("openai", key)
+				if err := SaveAPIKey("openai", key); err != nil {
+					fmt.Printf("%s %v\n", style.Error("Error:"), err)
+					return false
+				}
 				openaiAPIKey = key // Set for current session
 			} else {
 				fmt.Println(style.Warning("No key provided. Will proceed without AI-generated rationales."))

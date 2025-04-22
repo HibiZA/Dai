@@ -110,7 +110,11 @@ func checkRequiredKeys() bool {
 			token = strings.TrimSpace(token)
 
 			if token != "" {
-				saveAPIKey("github", token)
+				// Use the config command directly since saveAPIKey is not exported
+				err := saveGitHubToken(token)
+				if err != nil {
+					fmt.Println(style.Error("Error:"), "Failed to save GitHub token:", err)
+				}
 			} else {
 				fmt.Println(style.Warning("No token provided. Scanning may hit API rate limits."))
 				fmt.Println(style.Info("You can set a token later with: dai config --set github --github-token YOUR_TOKEN"))
@@ -121,6 +125,11 @@ func checkRequiredKeys() bool {
 	}
 
 	return true
+}
+
+// saveGitHubToken is a helper function to save the GitHub token
+func saveGitHubToken(token string) error {
+	return SaveAPIKey("github", token)
 }
 
 func scanProject() {

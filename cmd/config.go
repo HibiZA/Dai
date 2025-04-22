@@ -176,13 +176,12 @@ func maskSecret(secret string) string {
 	return secret[:3] + "..." + secret[len(secret)-3:]
 }
 
-// saveAPIKey saves an API key to the config file
-func saveAPIKey(keyType, value string) {
+// SaveAPIKey saves an API key to the config file (exported version for use by other commands)
+func SaveAPIKey(keyType, value string) error {
 	// Create config directory if it doesn't exist
 	configDir := getConfigDir()
 	if err := os.MkdirAll(configDir, 0755); err != nil {
-		fmt.Println(style.Error("Error:"), "Failed to create config directory:", err)
-		return
+		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
 	// Determine environment variable name
@@ -193,8 +192,7 @@ func saveAPIKey(keyType, value string) {
 	case "github":
 		envName = "DAI_GITHUB_TOKEN"
 	default:
-		fmt.Println(style.Error("Error:"), "Unknown key type:", keyType)
-		return
+		return fmt.Errorf("unknown key type: %s", keyType)
 	}
 
 	// Save to config file
@@ -229,12 +227,35 @@ func saveAPIKey(keyType, value string) {
 	}
 
 	if err := os.WriteFile(configFile, []byte(configContent.String()), 0600); err != nil {
-		fmt.Println(style.Error("Error:"), "Failed to write config file:", err)
-		return
+		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
 	// Also set for current session
 	os.Setenv(envName, value)
+
+	return nil
+}
+
+// saveAPIKey saves an API key to the config file (internal version used by config command)
+func saveAPIKey(keyType, value string) {
+	err := SaveAPIKey(keyType, value)
+	if err != nil {
+		fmt.Println(style.Error("Error:"), err)
+		return
+	}
+
+	// Determine environment variable name for display purposes
+	var envName string
+	switch keyType {
+	case "openai":
+		envName = "DAI_OPENAI_API_KEY"
+	case "github":
+		envName = "DAI_GITHUB_TOKEN"
+	}
+
+	// Get the config file path for display
+	configDir := getConfigDir()
+	configFile := filepath.Join(configDir, "config.env")
 
 	fmt.Printf("%s %s %s\n",
 		style.Success("✓"),
