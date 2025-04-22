@@ -4,82 +4,107 @@ import (
 	"testing"
 )
 
-func TestParse(t *testing.T) {
+func TestNormalizeVersion(t *testing.T) {
 	tests := []struct {
 		input    string
-		expected *Version
-		wantErr  bool
+		expected string
 	}{
-		{"1.2.3", &Version{Major: 1, Minor: 2, Patch: 3}, false},
-		{"1.2", &Version{Major: 1, Minor: 2, Patch: 0}, false},
-		{"1", &Version{Major: 1, Minor: 0, Patch: 0}, false},
-		{"1.2.3-beta", &Version{Major: 1, Minor: 2, Patch: 3, Prerelease: "beta"}, false},
-		{"1.2.3+build", &Version{Major: 1, Minor: 2, Patch: 3, Build: "build"}, false},
-		{"1.2.3-beta+build", &Version{Major: 1, Minor: 2, Patch: 3, Prerelease: "beta", Build: "build"}, false},
-		{"v1.2.3", &Version{Major: 1, Minor: 2, Patch: 3}, false},
-		{"invalid", nil, true},
+		{"1.2.3", "1.2.3"},
+		{"^1.2.3", "1.2.3"},
+		{"~1.2.3", "1.2.3"},
+		{">1.2.3", "1.2.3"},
+		{">=1.2.3", "1.2.3"},
+		{"<1.2.3", "1.2.3"},
+		{"<=1.2.3", "1.2.3"},
+		{"=1.2.3", "1.2.3"},
+		{"^0.2.3", "0.2.3"},
+		{"  ^1.2.3  ", "1.2.3"},
 	}
 
 	for _, test := range tests {
-		v, err := Parse(test.input)
-		if (err != nil) != test.wantErr {
-			t.Errorf("Parse(%q) error = %v, wantErr %v", test.input, err, test.wantErr)
-			continue
+		result := NormalizeVersion(test.input)
+		if result != test.expected {
+			t.Errorf("NormalizeVersion(%q) = %q, expected %q", test.input, result, test.expected)
+		}
+	}
+}
+
+func TestParse(t *testing.T) {
+	tests := []struct {
+		version  string
+		expected *Version
+		valid    bool
+	}{
+		{"1.2.3", &Version{Major: 1, Minor: 2, Patch: 3}, true},
+		{"v1.2.3", &Version{Major: 1, Minor: 2, Patch: 3}, true},
+		{"1.2", &Version{Major: 1, Minor: 2, Patch: 0}, true},
+		{"1", &Version{Major: 1, Minor: 0, Patch: 0}, true},
+		{"1.2.3-beta", &Version{Major: 1, Minor: 2, Patch: 3, Prerelease: "beta"}, true},
+		{"1.2.3+build", &Version{Major: 1, Minor: 2, Patch: 3, Build: "build"}, true},
+		{"1.2.3-beta+build", &Version{Major: 1, Minor: 2, Patch: 3, Prerelease: "beta", Build: "build"}, true},
+		{"^1.2.3", &Version{Major: 1, Minor: 2, Patch: 3}, true},
+		{"~1.2.3", &Version{Major: 1, Minor: 2, Patch: 3}, true},
+		{"invalid", nil, false},
+	}
+
+	for _, test := range tests {
+		result, err := Parse(test.version)
+		if test.valid && err != nil {
+			t.Errorf("Parse(%q) returned error: %v", test.version, err)
+		} else if !test.valid && err == nil {
+			t.Errorf("Parse(%q) should have returned an error", test.version)
 		}
 
-		if test.wantErr {
-			continue
-		}
-
-		if v.Major != test.expected.Major ||
-			v.Minor != test.expected.Minor ||
-			v.Patch != test.expected.Patch ||
-			v.Prerelease != test.expected.Prerelease ||
-			v.Build != test.expected.Build {
-			t.Errorf("Parse(%q) = %+v, want %+v", test.input, v, test.expected)
+		if test.valid {
+			if result.Major != test.expected.Major ||
+				result.Minor != test.expected.Minor ||
+				result.Patch != test.expected.Patch ||
+				result.Prerelease != test.expected.Prerelease ||
+				result.Build != test.expected.Build {
+				t.Errorf("Parse(%q) = %+v, expected %+v", test.version, result, test.expected)
+			}
 		}
 	}
 }
 
 func TestParseConstraint(t *testing.T) {
 	tests := []struct {
-		input           string
+		constraint      string
 		expectedType    string
 		expectedVersion *Version
-		wantErr         bool
+		valid           bool
 	}{
-		{"^1.2.3", "^", &Version{Major: 1, Minor: 2, Patch: 3}, false},
-		{"~1.2.3", "~", &Version{Major: 1, Minor: 2, Patch: 3}, false},
-		{">1.2.3", ">", &Version{Major: 1, Minor: 2, Patch: 3}, false},
-		{"<1.2.3", "<", &Version{Major: 1, Minor: 2, Patch: 3}, false},
-		{">=1.2.3", ">=", &Version{Major: 1, Minor: 2, Patch: 3}, false},
-		{"<=1.2.3", "<=", &Version{Major: 1, Minor: 2, Patch: 3}, false},
-		{"=1.2.3", "=", &Version{Major: 1, Minor: 2, Patch: 3}, false},
-		{"1.2.3", "", &Version{Major: 1, Minor: 2, Patch: 3}, false},
-		{"invalid", "", nil, true},
+		{"^1.2.3", "^", &Version{Major: 1, Minor: 2, Patch: 3}, true},
+		{"~1.2.3", "~", &Version{Major: 1, Minor: 2, Patch: 3}, true},
+		{">1.2.3", ">", &Version{Major: 1, Minor: 2, Patch: 3}, true},
+		{">=1.2.3", ">=", &Version{Major: 1, Minor: 2, Patch: 3}, true},
+		{"<1.2.3", "<", &Version{Major: 1, Minor: 2, Patch: 3}, true},
+		{"<=1.2.3", "<=", &Version{Major: 1, Minor: 2, Patch: 3}, true},
+		{"=1.2.3", "=", &Version{Major: 1, Minor: 2, Patch: 3}, true},
+		{"1.2.3", "", &Version{Major: 1, Minor: 2, Patch: 3}, true},
+		{"invalid", "", nil, false},
 	}
 
 	for _, test := range tests {
-		constraintType, v, err := ParseConstraint(test.input)
-		if (err != nil) != test.wantErr {
-			t.Errorf("ParseConstraint(%q) error = %v, wantErr %v", test.input, err, test.wantErr)
-			continue
+		constraintType, version, err := ParseConstraint(test.constraint)
+		if test.valid && err != nil {
+			t.Errorf("ParseConstraint(%q) returned error: %v", test.constraint, err)
+		} else if !test.valid && err == nil {
+			t.Errorf("ParseConstraint(%q) should have returned an error", test.constraint)
 		}
 
-		if test.wantErr {
-			continue
-		}
+		if test.valid {
+			if constraintType != test.expectedType {
+				t.Errorf("ParseConstraint(%q) returned constraint type %q, expected %q",
+					test.constraint, constraintType, test.expectedType)
+			}
 
-		if constraintType != test.expectedType {
-			t.Errorf("ParseConstraint(%q) constraint type = %q, want %q", test.input, constraintType, test.expectedType)
-		}
-
-		if v.Major != test.expectedVersion.Major ||
-			v.Minor != test.expectedVersion.Minor ||
-			v.Patch != test.expectedVersion.Patch ||
-			v.Prerelease != test.expectedVersion.Prerelease ||
-			v.Build != test.expectedVersion.Build {
-			t.Errorf("ParseConstraint(%q) version = %+v, want %+v", test.input, v, test.expectedVersion)
+			if version.Major != test.expectedVersion.Major ||
+				version.Minor != test.expectedVersion.Minor ||
+				version.Patch != test.expectedVersion.Patch {
+				t.Errorf("ParseConstraint(%q) returned version %+v, expected %+v",
+					test.constraint, version, test.expectedVersion)
+			}
 		}
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 // Version represents a semver version
@@ -28,8 +29,29 @@ func ConstraintRegexForDebug() *regexp.Regexp {
 	return constraintRegex
 }
 
+// NormalizeVersion strips range indicators (^, ~, etc.) from version strings
+// to get a clean version string for parsing
+func NormalizeVersion(version string) string {
+	// Trim spaces first
+	version = strings.TrimSpace(version)
+
+	// Remove range indicators
+	version = strings.TrimPrefix(version, "^")
+	version = strings.TrimPrefix(version, "~")
+	version = strings.TrimPrefix(version, ">=")
+	version = strings.TrimPrefix(version, ">")
+	version = strings.TrimPrefix(version, "<=")
+	version = strings.TrimPrefix(version, "<")
+	version = strings.TrimPrefix(version, "=")
+
+	return strings.TrimSpace(version)
+}
+
 // Parse parses a semver string into a Version
 func Parse(version string) (*Version, error) {
+	// First normalize the version by removing any range indicators
+	version = NormalizeVersion(version)
+
 	// Now parse the clean version
 	matches := semverRegex.FindStringSubmatch(version)
 	if matches == nil {
@@ -62,16 +84,26 @@ func Parse(version string) (*Version, error) {
 func ParseConstraint(constraint string) (string, *Version, error) {
 	matches := constraintRegex.FindStringSubmatch(constraint)
 	if matches == nil || len(matches) < 3 {
-		return "", nil, fmt.Errorf("invalid constraint format: %s", constraint)
+		// Try parsing it as a plain version without constraints
+		version, err := Parse(constraint)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid constraint format: %s", constraint)
+		}
+		return "", version, nil
 	}
 
 	constraintType := matches[1]
 	versionStr := matches[2]
 
-	// Parse the version part
+	// Parse the version part (after normalizing it)
 	version, err := Parse(versionStr)
 	if err != nil {
-		return "", nil, err
+		// Attempt to normalize and parse again if the first attempt failed
+		normalizedVersion := NormalizeVersion(versionStr)
+		version, err = Parse(normalizedVersion)
+		if err != nil {
+			return "", nil, err
+		}
 	}
 
 	return constraintType, version, nil

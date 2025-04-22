@@ -163,6 +163,9 @@ func (c *NVDClient) FindVulnerabilities(ecosystem, packageName, version string) 
 		return nil, fmt.Errorf("unsupported ecosystem: %s", ecosystem)
 	}
 
+	// Normalize the version before processing
+	normalizedVersion := semver.NormalizeVersion(version)
+
 	// Build the query URL
 	queryParams := url.Values{}
 	queryParams.Add("keywordSearch", packageName)
@@ -200,12 +203,14 @@ func (c *NVDClient) FindVulnerabilities(ecosystem, packageName, version string) 
 	// Parse the response
 	var response NVDResponse
 	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	// Process the vulnerabilities to find those affecting the specified package and version
+	// Process the vulnerabilities to find those affecting the specified version
 	var vulnerabilities []Vulnerability
-	parsedVersion, err := semver.Parse(version)
+
+	// Parse the normalized version
+	parsedVersion, err := semver.Parse(normalizedVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse version: %w", err)
 	}

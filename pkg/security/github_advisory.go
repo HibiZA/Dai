@@ -118,7 +118,10 @@ func (c *GitHubAdvisoryClient) FindVulnerabilities(ecosystem, packageName, versi
 
 	// Process the advisories to find vulnerabilities affecting the specified version
 	var vulnerabilities []Vulnerability
-	parsedVersion, err := semver.Parse(version)
+
+	// Normalize and parse the version
+	normalizedVersion := semver.NormalizeVersion(version)
+	parsedVersion, err := semver.Parse(normalizedVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse version: %w", err)
 	}
