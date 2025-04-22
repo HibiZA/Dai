@@ -159,7 +159,7 @@ jobs:
             end
           
             def install
-              bin.install "dai-cli"
+              bin.install "dai"
             end
           
             test do
