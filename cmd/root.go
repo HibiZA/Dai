@@ -27,6 +27,31 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+func init() {
+	// Override the default help template to use our colorful help
+	cobra.AddTemplateFunc("StyleTitle", style.Title)
+	cobra.AddTemplateFunc("StyleSubtitle", style.Subtitle)
+	cobra.AddTemplateFunc("StyleHighlight", style.Highlight)
+	cobra.AddTemplateFunc("StylePackage", style.Package)
+	cobra.AddTemplateFunc("StyleInfo", style.Info)
+
+	// Always use our custom help
+	rootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		displayColorfulHelp(cmd)
+	})
+
+	// Add version command
+	versionCmd := &cobra.Command{
+		Use:   "version",
+		Short: "Display the version of Dai CLI",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println(style.Title("Dai CLI Version:"), style.Highlight(VersionCommand()))
+		},
+	}
+
+	rootCmd.AddCommand(versionCmd)
+}
+
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
@@ -93,17 +118,4 @@ func displayColorfulHelp(cmd *cobra.Command) {
 	// Footer
 	fmt.Printf("Use %s for more information about a command.\n",
 		style.BoldItalicize(fmt.Sprintf("\"dai [command] --help\"")))
-}
-
-// Add a version command
-func init() {
-	versionCmd := &cobra.Command{
-		Use:   "version",
-		Short: "Display the version of Dai CLI",
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println(style.Title("Dai CLI Version:"), style.Highlight(VersionCommand()))
-		},
-	}
-
-	rootCmd.AddCommand(versionCmd)
 }

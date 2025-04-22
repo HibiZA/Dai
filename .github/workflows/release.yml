@@ -49,6 +49,14 @@ jobs:
           # Update the version in the existing file instead of creating a new one
           sed -i "s/var Version = \"[^\"]*\"/var Version = \"${{ steps.get_version.outputs.version }}\"/" cmd/root.go
 
+      - name: Test local build
+        run: |
+          go build -o dai
+          echo "Testing help command..."
+          ./dai --help
+          echo "Testing version command..."
+          ./dai version
+
       - name: Build binaries
         run: |
           mkdir -p dist
