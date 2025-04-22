@@ -13,6 +13,7 @@ import (
 	"github.com/HibiZA/dai/pkg/npm"
 	"github.com/HibiZA/dai/pkg/parser"
 	"github.com/HibiZA/dai/pkg/semver"
+	"github.com/HibiZA/dai/pkg/style"
 	"github.com/spf13/cobra"
 )
 
@@ -41,7 +42,72 @@ func init() {
 	upgradeCmd.Flags().BoolVar(&simulateFlag, "simulate", false, "Simulate upgrades (don't actually check npm registry)")
 	upgradeCmd.Flags().BoolVar(&testAIFlag, "test-ai", false, "Test AI-generated content quality for specific packages")
 
+	// Set custom help function
+	upgradeCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		// Display custom colorful help
+		displayUpgradeHelp(cmd)
+	})
+
 	rootCmd.AddCommand(upgradeCmd)
+}
+
+// displayUpgradeHelp shows custom styled help for the upgrade command
+func displayUpgradeHelp(cmd *cobra.Command) {
+	fmt.Println(style.Banner())
+	fmt.Println()
+
+	// Command name
+	fmt.Printf("%s - %s\n\n", style.Title("Upgrade Command"), style.Subtitle("Smart Dependency Upgrader"))
+
+	// Description
+	fmt.Println(style.Info("Upgrade command applies version bumps to specified packages and generates a patch with AI-drafted rationales."))
+	fmt.Println()
+
+	// Usage section
+	fmt.Println(style.Title("Usage:"))
+	fmt.Printf("  %s\n\n", style.Highlight("dai upgrade [packages] [flags]"))
+
+	// Flags section
+	fmt.Println(style.Title("Flags:"))
+
+	// Format all flags in a consistent and colorful way
+	flagsInfo := []struct {
+		flag string
+		desc string
+	}{
+		{"-a, --all", "Upgrade all dependencies"},
+		{"--apply", "Apply upgrades to package.json"},
+		{"-d, --debug", "Enable debug output"},
+		{"--dry-run", "Show what would be upgraded without making changes"},
+		{"-k, --openai-key string", "OpenAI API key (or set DAI_OPENAI_API_KEY env var)"},
+		{"-p, --pr", "Create a pull request with the changes"},
+		{"--registry string", "NPM registry URL (defaults to https://registry.npmjs.org)"},
+		{"--simulate", "Simulate upgrades (don't actually check npm registry)"},
+		{"--test-ai", "Test AI-generated content quality for specific packages"},
+		{"-t, --github-token string", "GitHub token (or set DAI_GITHUB_TOKEN env var)"},
+		{"-h, --help", "Help for upgrade command"},
+	}
+
+	for _, f := range flagsInfo {
+		fmt.Printf("  %-32s %s\n",
+			style.Highlight(f.flag),
+			style.Subtitle(f.desc))
+	}
+	fmt.Println()
+
+	// Examples section
+	fmt.Println(style.Title("Examples:"))
+	fmt.Printf("  %s\n", style.Subtitle("# Upgrade a specific package"))
+	fmt.Printf("  %s\n\n", style.Highlight("dai upgrade react"))
+
+	fmt.Printf("  %s\n", style.Subtitle("# Upgrade multiple packages"))
+	fmt.Printf("  %s\n\n", style.Highlight("dai upgrade react,react-dom,redux"))
+
+	fmt.Printf("  %s\n", style.Subtitle("# Upgrade all dependencies"))
+	fmt.Printf("  %s\n\n", style.Highlight("dai upgrade --all"))
+
+	fmt.Printf("  %s\n", style.Subtitle("# Apply upgrades and create a PR"))
+	fmt.Printf("  %s\n", style.Highlight("dai upgrade --all --apply --pr"))
 }
 
 var upgradeCmd = &cobra.Command{
@@ -78,20 +144,20 @@ var upgradeCmd = &cobra.Command{
 
 func upgradePackages(packages []string) {
 	if len(packages) == 0 && !allFlag {
-		fmt.Println("No packages specified, use comma-separated list or --all flag")
+		fmt.Println(style.Warning("No packages specified, use comma-separated list or --all flag"))
 		return
 	}
 
 	// Find and parse package.json
 	dir, err := parser.FindPackageJSON()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "%s %v\n", style.Error("Error:"), err)
 		os.Exit(1)
 	}
 
 	pkg, err := parser.ParsePackageJSON(dir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "%s %v\n", style.Error("Error:"), err)
 		os.Exit(1)
 	}
 
@@ -121,11 +187,15 @@ func upgradePackages(packages []string) {
 	}
 
 	if len(packagesToUpgrade) == 0 {
-		fmt.Println("No valid packages to upgrade")
+		fmt.Println(style.Warning("No valid packages to upgrade"))
 		return
 	}
 
-	fmt.Printf("Checking upgrades for %d packages...\n", len(packagesToUpgrade))
+	fmt.Printf("%s %s\n",
+		style.Header("🔄 Checking upgrades for"),
+		style.Highlight(fmt.Sprintf("%d packages...", len(packagesToUpgrade))))
+	fmt.Println(style.Divider())
+	fmt.Println()
 
 	// Add debug output for semver parsing
 	if debugFlag {
@@ -409,6 +479,28 @@ func upgradePackages(packages []string) {
 			}
 		}
 	}
+
+	// Show the upgrades found
+	if len(upgrades) == 0 {
+		fmt.Println(style.Success("✅ All packages are already up to date!"))
+		return
+	}
+
+	// Display upgrade summary
+	fmt.Printf("%s\n", style.Title("📦 Dependency Upgrade Summary"))
+	fmt.Println(style.Divider())
+	fmt.Printf("%s %d\n", style.Info("Total packages checked:"), len(upgrades))
+	fmt.Printf("%s %s\n\n", style.Success("Packages to upgrade:"), style.Success(fmt.Sprintf("%d", len(upgrades))))
+
+	// Print table header
+	fmt.Printf("%-20s %-15s %-15s %s\n",
+		style.Header("Package"),
+		style.Header("Current"),
+		style.Header("New Version"),
+		style.Header("Update Type"))
+	fmt.Println(strings.Repeat("-", 80))
+
+	// ... rest of the function ...
 }
 
 // testAIContentQuality tests the quality of AI-generated content for packages

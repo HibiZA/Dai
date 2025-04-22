@@ -7,6 +7,8 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
+
+	"github.com/HibiZA/dai/pkg/style"
 )
 
 // SeverityWeight maps severity levels to numeric weights for sorting
@@ -215,29 +217,32 @@ func WriteConsoleReport(w io.Writer, reports map[string]*VulnerabilityReport) {
 	sort.Strings(safe)
 
 	// Print summary
-	fmt.Fprintf(w, "📊 Vulnerability Scan Summary\n")
-	fmt.Fprintf(w, "========================\n")
-	fmt.Fprintf(w, "Total packages scanned: %d\n", len(reports))
-	fmt.Fprintf(w, "Vulnerable packages: %d\n", len(vulnerable))
-	fmt.Fprintf(w, "Clean packages: %d\n\n", len(safe))
+	fmt.Fprintf(w, "%s\n", style.Title("📊 Vulnerability Scan Summary"))
+	fmt.Fprintf(w, "%s\n", style.Divider())
+	fmt.Fprintf(w, "%s %d\n", style.Info("Total packages scanned:"), len(reports))
+	fmt.Fprintf(w, "%s %s\n", style.Warning("Vulnerable packages:"), style.Warning(fmt.Sprintf("%d", len(vulnerable))))
+	fmt.Fprintf(w, "%s %s\n\n", style.Success("Clean packages:"), style.Success(fmt.Sprintf("%d", len(safe))))
 
 	// Print vulnerable packages
 	if len(vulnerable) > 0 {
-		fmt.Fprintf(w, "🚨 Vulnerable Packages:\n")
-		fmt.Fprintf(w, "---------------------\n")
+		fmt.Fprintf(w, "%s\n", style.Error("🚨 Vulnerable Packages:"))
+		fmt.Fprintf(w, "%s\n", style.Divider())
 		for _, pkg := range vulnerable {
 			report := reports[pkg]
 			counts := report.CountBySeverity()
 
 			totalVulns := len(report.Vulnerabilities)
-			fmt.Fprintf(w, "• %s@%s: %d vulnerabilities\n", pkg, report.Version, totalVulns)
+			fmt.Fprintf(w, "%s %s: %s\n",
+				style.Bullet("•"),
+				style.FormatPackage(pkg, report.Version),
+				style.Warning(fmt.Sprintf("%d vulnerabilities", totalVulns)))
 
 			// Print severity counts in a nice format
 			var sevCounts []string
 			severities := []string{"CRITICAL", "HIGH", "MEDIUM", "LOW"}
 			for _, sev := range severities {
 				if count, ok := counts[sev]; ok && count > 0 {
-					sevCounts = append(sevCounts, fmt.Sprintf("%d %s", count, sev))
+					sevCounts = append(sevCounts, fmt.Sprintf("%d %s", count, style.GetSeverityColor(sev)))
 				}
 			}
 			if len(sevCounts) > 0 {
@@ -249,13 +254,15 @@ func WriteConsoleReport(w io.Writer, reports map[string]*VulnerabilityReport) {
 
 	// Print safe packages
 	if len(safe) > 0 {
-		fmt.Fprintf(w, "✅ Clean Packages:\n")
-		fmt.Fprintf(w, "----------------\n")
+		fmt.Fprintf(w, "%s\n", style.Success("✅ Clean Packages:"))
+		fmt.Fprintf(w, "%s\n", style.Divider())
 		for i, pkg := range safe {
 			if i > 0 && i%5 == 0 {
 				fmt.Fprintln(w)
 			}
-			fmt.Fprintf(w, "• %s@%s  ", pkg, reports[pkg].Version)
+			fmt.Fprintf(w, "%s %s  ",
+				style.Bullet("•"),
+				style.FormatPackage(pkg, reports[pkg].Version))
 		}
 		fmt.Fprintln(w)
 		fmt.Fprintln(w)
@@ -263,12 +270,46 @@ func WriteConsoleReport(w io.Writer, reports map[string]*VulnerabilityReport) {
 
 	// Print detailed reports for vulnerable packages
 	if len(vulnerable) > 0 {
-		fmt.Fprintf(w, "📝 Detailed Vulnerability Reports\n")
-		fmt.Fprintf(w, "===============================\n\n")
+		fmt.Fprintf(w, "%s\n", style.Header("📝 Detailed Vulnerability Reports"))
+		fmt.Fprintf(w, "%s\n\n", style.Divider())
 
 		for _, pkg := range vulnerable {
 			fmt.Fprintln(w, strings.Repeat("-", 80))
-			reports[pkg].WriteText(w)
+			fmt.Fprintf(w, "%s for %s\n",
+				style.Subheader("Security Vulnerability Report"),
+				style.FormatPackage(pkg, reports[pkg].Version))
+			fmt.Fprintf(w, "Generated: %s\n\n", style.Info(reports[pkg].Timestamp.Format(time.RFC1123)))
+
+			// Print summary
+			fmt.Fprintf(w, "Found %s:\n", style.Warning(fmt.Sprintf("%d vulnerabilities", len(reports[pkg].Vulnerabilities))))
+			counts := reports[pkg].CountBySeverity()
+			severities := []string{"CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN"}
+			for _, sev := range severities {
+				if count, ok := counts[sev]; ok && count > 0 {
+					fmt.Fprintf(w, "  %s %s: %d\n", style.Bullet("•"), style.GetSeverityColor(sev), count)
+				}
+			}
+			fmt.Fprintln(w)
+
+			// Print detailed vulnerability information
+			fmt.Fprintf(w, "%s:\n", style.Subheader("Vulnerability Details"))
+			fmt.Fprintln(w, style.Divider())
+
+			for i, vuln := range reports[pkg].Vulnerabilities {
+				fmt.Fprintf(w, "[%d] %s (%s)\n",
+					i+1,
+					style.Highlight(vuln.ID),
+					style.GetSeverityColor(vuln.Severity))
+				fmt.Fprintf(w, "    %s %s\n", style.Info("Description:"), vuln.Description)
+				fmt.Fprintf(w, "    %s %s\n", style.Info("Published:"), vuln.Published.Format("2006-01-02"))
+				if len(vuln.References) > 0 {
+					fmt.Fprintf(w, "    %s\n", style.Info("References:"))
+					for _, ref := range vuln.References {
+						fmt.Fprintf(w, "      %s %s\n", style.Bullet("•"), style.URL(ref))
+					}
+				}
+				fmt.Fprintln(w)
+			}
 			fmt.Fprintln(w)
 		}
 	}
